@@ -1,0 +1,16 @@
+{
+  "name": "@ai-workforce/backend",
+  "version": "1.0.0",
+  "description": "Backend service for AI Workforce Dashboard built with Core Node.js",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.11.5"
+  }
+}
