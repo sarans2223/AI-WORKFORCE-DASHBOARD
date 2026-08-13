@@ -1,14 +1,4 @@
-# Environment variables
-.env
-.env.*
-
-# Allow example environment file
-!.env.example
-
-# Node
 node_modules/
-
-# Logs
-*.log
-apps/backend/.env
-apps/backend/node_modules/
+dist/
+.env
+.env.local
