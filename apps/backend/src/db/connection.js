@@ -7,7 +7,18 @@ pool.on("error", (err) => {
   console.error("Unexpected error on idle PostgreSQL client:", err.message);
 });
 
-const query = (text, params) => pool.query(text, params);
+const query = async (text, params) => {
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    console.error(`[DB ERROR] Query failed: ${err.message}`);
+    console.error(`[DB ERROR] Statement: ${text}`);
+    if (params) {
+      console.error(`[DB ERROR] Parameters:`, params);
+    }
+    throw err;
+  }
+};
 
 const testConnection = async () => {
   try {
