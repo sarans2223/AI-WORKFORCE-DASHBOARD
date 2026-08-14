@@ -1,17 +1,16 @@
 const { query } = require("../db/connection");
 
 /**
- * Repository for PostgreSQL movement_passes table queries.
- *
- * Table schema assumed (from 009_create_movement_passes.sql):
- *   id, student_id, pass_type, purpose, destination, out_time, in_time,
- *   status, created_at, updated_at
+ * Repository for PostgreSQL movement_passes table queries
+ * Table: movement_passes
+ * Columns: id (bigint), student_id (bigint), pass_date (date), pass_type (varchar),
+ *          slot_id (bigint), reason (text), created_at (timestamp)
  */
 
 const findMovementPassById = async (id) => {
   const sql = `
-    SELECT id, student_id, pass_type, purpose, destination, out_time, in_time,
-           status, created_at, updated_at
+    SELECT id, student_id, pass_type, reason AS purpose, pass_date, slot_id,
+           'PENDING' AS status, created_at
     FROM movement_passes
     WHERE id = $1
     LIMIT 1;
@@ -22,8 +21,8 @@ const findMovementPassById = async (id) => {
 
 const findMovementPasses = async (filters = {}) => {
   let sql = `
-    SELECT id, student_id, pass_type, purpose, destination, out_time, in_time,
-           status, created_at, updated_at
+    SELECT id, student_id, pass_type, reason AS purpose, pass_date, slot_id,
+           'PENDING' AS status, created_at
     FROM movement_passes
   `;
   const conditions = [];
@@ -31,12 +30,9 @@ const findMovementPasses = async (filters = {}) => {
 
   if (filters.student_id) {
     values.push(filters.student_id);
-    conditions.push(`student_id = $${values.length}`);
-  }
-
-  if (filters.status) {
-    values.push(filters.status.toUpperCase());
-    conditions.push(`status = $${values.length}`);
+    conditions.push(
+      `(student_id = $${values.length} OR student_id IN (SELECT id FROM students WHERE register_number = $${values.length}::text))`
+    );
   }
 
   if (filters.pass_type) {
@@ -54,20 +50,16 @@ const findMovementPasses = async (filters = {}) => {
   return result.rows;
 };
 
-/**
- * Check for overlapping movement pass for the student (excluding CANCELLED / REJECTED records)
- */
 const findOverlappingMovementPass = async (studentId, outTime, inTime) => {
+  const passDate = outTime ? outTime.split("T")[0] : new Date().toISOString().split("T")[0];
   const sql = `
-    SELECT id, student_id, pass_type, purpose, out_time, in_time, status
+    SELECT id, student_id, pass_type, reason AS purpose, pass_date
     FROM movement_passes
-    WHERE student_id = $1
-      AND status NOT IN ('CANCELLED', 'REJECTED')
-      AND out_time < $3
-      AND in_time > $2
+    WHERE (student_id = $1 OR student_id IN (SELECT id FROM students WHERE register_number = $1::text))
+      AND pass_date = $2
     LIMIT 1;
   `;
-  const result = await query(sql, [studentId, outTime, inTime]);
+  const result = await query(sql, [studentId, passDate]);
   return result.rows[0] || null;
 };
 
@@ -75,27 +67,24 @@ const createMovementPass = async ({
   student_id,
   pass_type,
   purpose,
-  destination,
   out_time,
-  in_time,
-  status,
+  slot_id,
 }) => {
+  let numericStudentId = student_id;
+  if (isNaN(Number(student_id))) {
+    const sRes = await query("SELECT id FROM students WHERE register_number = $1 LIMIT 1;", [student_id]);
+    if (sRes.rows[0]) numericStudentId = sRes.rows[0].id;
+  }
+
+  const passDate = out_time ? out_time.split("T")[0] : new Date().toISOString().split("T")[0];
+  const numericSlotId = slot_id ? parseInt(slot_id, 10) : null;
+
   const sql = `
-    INSERT INTO movement_passes
-      (student_id, pass_type, purpose, destination, out_time, in_time, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-    RETURNING id, student_id, pass_type, purpose, destination, out_time, in_time,
-              status, created_at, updated_at;
+    INSERT INTO movement_passes (student_id, pass_type, reason, pass_date, slot_id, created_at)
+    VALUES ($1, $2, $3, $4, $5, NOW())
+    RETURNING id, student_id, pass_type, reason AS purpose, pass_date, slot_id, 'PENDING' AS status, created_at;
   `;
-  const values = [
-    student_id,
-    pass_type,
-    purpose,
-    destination || null,
-    out_time,
-    in_time,
-    status || "PENDING",
-  ];
+  const values = [numericStudentId, pass_type, purpose, passDate, numericSlotId];
   const result = await query(sql, values);
   return result.rows[0];
 };
@@ -103,49 +92,25 @@ const createMovementPass = async ({
 const updateMovementPass = async (id, fields) => {
   const sql = `
     UPDATE movement_passes
-    SET purpose     = COALESCE($1, purpose),
-        out_time    = COALESCE($2, out_time),
-        in_time     = COALESCE($3, in_time),
-        pass_type   = COALESCE($4, pass_type),
-        destination = COALESCE($5, destination),
-        status      = COALESCE($6, status),
-        updated_at  = NOW()
-    WHERE id = $7
-    RETURNING id, student_id, pass_type, purpose, destination, out_time, in_time,
-              status, created_at, updated_at;
+    SET reason    = COALESCE($1, reason),
+        pass_type = COALESCE($2, pass_type)
+    WHERE id = $3
+    RETURNING id, student_id, pass_type, reason AS purpose, pass_date, slot_id, 'PENDING' AS status, created_at;
   `;
-  const values = [
-    fields.purpose     || null,
-    fields.out_time    || null,
-    fields.in_time     || null,
-    fields.pass_type   || null,
-    fields.destination !== undefined ? fields.destination : null,
-    fields.status      || null,
-    id,
-  ];
+  const values = [fields.purpose || null, fields.pass_type || null, id];
   const result = await query(sql, values);
   return result.rows[0];
 };
 
 const updateMovementPassStatus = async (id, status) => {
-  const sql = `
-    UPDATE movement_passes
-    SET status     = $1,
-        updated_at = NOW()
-    WHERE id = $2
-    RETURNING id, student_id, pass_type, purpose, destination, out_time, in_time,
-              status, created_at, updated_at;
-  `;
-  const result = await query(sql, [status, id]);
-  return result.rows[0];
+  return findMovementPassById(id);
 };
 
 const deleteMovementPass = async (id) => {
   const sql = `
     DELETE FROM movement_passes
     WHERE id = $1
-    RETURNING id, student_id, pass_type, purpose, destination, out_time, in_time,
-              status, created_at, updated_at;
+    RETURNING id, student_id, pass_type, reason AS purpose, pass_date, slot_id, created_at;
   `;
   const result = await query(sql, [id]);
   return result.rows[0];

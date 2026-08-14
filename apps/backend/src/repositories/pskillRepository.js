@@ -1,168 +1,377 @@
 const { query } = require("../db/connection");
 
 /**
- * Repository for PostgreSQL P-Skills table queries.
+ * Repository for PostgreSQL P-Skill related tables:
  *
- * Tables assumed (based on project migration file names):
- *   pskills            - catalog of all available P-Skills
- *   student_pskills    - student enrollment/assignment records
- *   pskill_slots       - predefined time slots for P-Skills
+ *   p_skills
+ *   p_skill_slots
+ *   p_skill_levels
+ *   student_pskills
+ *
+ * Expected schema:
+ *   p_skills
+ *     - id
+ *     - name
+ *     - description
+ *     - created_at
+ *
+ *   p_skill_slots
+ *     - id
+ *     - slot_name
+ *     - start_time
+ *     - end_time
+ *     - created_at
+ *
+ *   p_skill_levels
+ *     - id
+ *     - p_skill_id
+ *     - level_code
+ *
+ *   student_pskills
+ *     - id
+ *     - student_id
+ *     - p_skill_level_id
+ *     - completed
+ *     - completed_at
  */
 
-/* ─────────────────────────────────────────────
+/* =========================================================
    P-SKILL CATALOG
-───────────────────────────────────────────── */
+========================================================= */
 
 const findAllPSkills = async () => {
   const sql = `
-    SELECT id, name, description, category, created_at, updated_at
-    FROM pskills
+    SELECT
+      id,
+      name,
+      description,
+      created_at
+    FROM p_skills
     ORDER BY name ASC;
   `;
+
   const result = await query(sql);
   return result.rows;
 };
 
 const findPSkillById = async (id) => {
   const sql = `
-    SELECT id, name, description, category, created_at, updated_at
-    FROM pskills
+    SELECT
+      id,
+      name,
+      description,
+      created_at
+    FROM p_skills
     WHERE id = $1
     LIMIT 1;
   `;
+
   const result = await query(sql, [id]);
   return result.rows[0] || null;
 };
 
-/* ─────────────────────────────────────────────
+/* =========================================================
    P-SKILL SLOTS
-───────────────────────────────────────────── */
+========================================================= */
 
 const findAllPSkillSlots = async () => {
   const sql = `
-    SELECT id, pskill_id, slot_name, start_time, end_time, capacity, created_at, updated_at
-    FROM pskill_slots
+    SELECT
+      id,
+      slot_name,
+      start_time,
+      end_time,
+      created_at
+    FROM p_skill_slots
     ORDER BY start_time ASC;
   `;
+
   const result = await query(sql);
   return result.rows;
 };
 
 const findSlotById = async (slotId) => {
   const sql = `
-    SELECT id, pskill_id, slot_name, start_time, end_time, capacity, created_at, updated_at
-    FROM pskill_slots
+    SELECT
+      id,
+      slot_name,
+      start_time,
+      end_time,
+      created_at
+    FROM p_skill_slots
     WHERE id = $1
     LIMIT 1;
   `;
+
   const result = await query(sql, [slotId]);
   return result.rows[0] || null;
 };
 
 const countSlotEnrollments = async (slotId) => {
-  const sql = `
-    SELECT COUNT(*) AS enrolled
-    FROM student_pskills
-    WHERE slot_id = $1;
-  `;
-  const result = await query(sql, [slotId]);
-  return parseInt(result.rows[0]?.enrolled || 0, 10);
+  // Currently no slot_id relationship is defined
+  // in student_pskills based on the provided schema.
+  return 0;
 };
 
-/* ─────────────────────────────────────────────
+/* =========================================================
    STUDENT P-SKILL ASSIGNMENTS
-───────────────────────────────────────────── */
+========================================================= */
 
 const findStudentPSkills = async (studentId) => {
   const sql = `
-    SELECT sp.id, sp.student_id, sp.pskill_id, sp.slot_id, sp.level, sp.status,
-           sp.completed_at, sp.created_at, sp.updated_at,
-           p.name AS pskill_name, p.description AS pskill_description, p.category,
-           s.slot_name, s.start_time, s.end_time
+    SELECT
+      sp.id,
+      sp.student_id,
+      sp.p_skill_level_id,
+      sp.completed,
+      sp.completed_at,
+      psl.level_code AS level,
+      psl.p_skill_id,
+      ps.name AS pskill_name,
+      ps.description AS pskill_description
     FROM student_pskills sp
-    LEFT JOIN pskills p ON sp.pskill_id = p.id
-    LEFT JOIN pskill_slots s ON sp.slot_id = s.id
-    WHERE sp.student_id = $1
-    ORDER BY sp.created_at DESC;
+    LEFT JOIN p_skill_levels psl
+      ON sp.p_skill_level_id = psl.id
+    LEFT JOIN p_skills ps
+      ON psl.p_skill_id = ps.id
+    WHERE
+      sp.student_id = $1
+      OR sp.student_id IN (
+        SELECT id
+        FROM students
+        WHERE register_number = $1::text
+      )
+    ORDER BY sp.completed_at DESC NULLS LAST;
   `;
+
   const result = await query(sql, [studentId]);
   return result.rows;
 };
 
 const findStudentPSkillAssignment = async (studentId, pskillId) => {
   const sql = `
-    SELECT id, student_id, pskill_id, slot_id, level, status, completed_at, created_at, updated_at
-    FROM student_pskills
-    WHERE student_id = $1 AND pskill_id = $2
+    SELECT
+      sp.id,
+      sp.student_id,
+      sp.p_skill_level_id,
+      sp.completed,
+      sp.completed_at
+    FROM student_pskills sp
+    JOIN p_skill_levels psl
+      ON sp.p_skill_level_id = psl.id
+    WHERE
+      (
+        sp.student_id = $1
+        OR sp.student_id IN (
+          SELECT id
+          FROM students
+          WHERE register_number = $1::text
+        )
+      )
+      AND psl.p_skill_id = $2
     LIMIT 1;
   `;
+
   const result = await query(sql, [studentId, pskillId]);
   return result.rows[0] || null;
 };
 
 const findStudentPSkillById = async (id) => {
   const sql = `
-    SELECT sp.id, sp.student_id, sp.pskill_id, sp.slot_id, sp.level, sp.status,
-           sp.completed_at, sp.created_at, sp.updated_at,
-           p.name AS pskill_name, p.description AS pskill_description, p.category,
-           s.slot_name, s.start_time, s.end_time
+    SELECT
+      sp.id,
+      sp.student_id,
+      sp.p_skill_level_id,
+      sp.completed,
+      sp.completed_at,
+      psl.level_code AS level,
+      psl.p_skill_id,
+      ps.name AS pskill_name,
+      ps.description AS pskill_description
     FROM student_pskills sp
-    LEFT JOIN pskills p ON sp.pskill_id = p.id
-    LEFT JOIN pskill_slots s ON sp.slot_id = s.id
+    LEFT JOIN p_skill_levels psl
+      ON sp.p_skill_level_id = psl.id
+    LEFT JOIN p_skills ps
+      ON psl.p_skill_id = ps.id
     WHERE sp.id = $1
     LIMIT 1;
   `;
+
   const result = await query(sql, [id]);
   return result.rows[0] || null;
 };
 
-const assignPSkillToStudent = async ({ student_id, pskill_id, slot_id, level, status }) => {
-  const sql = `
-    INSERT INTO student_pskills (student_id, pskill_id, slot_id, level, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-    RETURNING id, student_id, pskill_id, slot_id, level, status, completed_at, created_at, updated_at;
+/* =========================================================
+   P-SKILL LEVEL
+========================================================= */
+
+const getOrCreateSkillLevel = async (
+  pskill_id,
+  levelCode = "BEGINNER"
+) => {
+  const selectSql = `
+    SELECT id
+    FROM p_skill_levels
+    WHERE
+      p_skill_id = $1
+      AND UPPER(level_code) = UPPER($2)
+    LIMIT 1;
   `;
-  const values = [student_id, pskill_id, slot_id || null, level, status || "NOT_STARTED"];
+
+  const selectRes = await query(selectSql, [
+    pskill_id,
+    levelCode,
+  ]);
+
+  if (selectRes.rows[0]) {
+    return selectRes.rows[0].id;
+  }
+
+  const insertSql = `
+    INSERT INTO p_skill_levels (
+      p_skill_id,
+      level_code
+    )
+    VALUES ($1, $2)
+    RETURNING id;
+  `;
+
+  const insertRes = await query(insertSql, [
+    pskill_id,
+    levelCode.toUpperCase(),
+  ]);
+
+  return insertRes.rows[0].id;
+};
+
+/* =========================================================
+   ASSIGN P-SKILL TO STUDENT
+========================================================= */
+
+const assignPSkillToStudent = async ({
+  student_id,
+  pskill_id,
+  level,
+  status,
+}) => {
+  // Resolve register_number to numeric student ID
+  let numericStudentId = student_id;
+
+  if (isNaN(Number(student_id))) {
+    const studentResult = await query(
+      `
+        SELECT id
+        FROM students
+        WHERE register_number = $1
+        LIMIT 1;
+      `,
+      [student_id]
+    );
+
+    if (studentResult.rows[0]) {
+      numericStudentId = studentResult.rows[0].id;
+    }
+  }
+
+  // Get or create P-Skill level
+  const levelId = await getOrCreateSkillLevel(
+    pskill_id,
+    level || "BEGINNER"
+  );
+
+  const isCompleted = status === "COMPLETED";
+
+  const sql = `
+    INSERT INTO student_pskills (
+      student_id,
+      p_skill_level_id,
+      completed,
+      completed_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      ${isCompleted ? "NOW()" : "NULL"}
+    )
+    RETURNING
+      id,
+      student_id,
+      p_skill_level_id,
+      completed,
+      completed_at;
+  `;
+
+  const values = [
+    numericStudentId,
+    levelId,
+    isCompleted,
+  ];
+
   const result = await query(sql, values);
+
   return result.rows[0];
 };
 
+/* =========================================================
+   UPDATE STUDENT P-SKILL
+========================================================= */
+
 const updateStudentPSkill = async (id, fields) => {
-  // Build completed_at logic: set when status becomes COMPLETED
-  let completedAtSql = "completed_at";
-  if (fields.status === "COMPLETED") {
-    completedAtSql = "COALESCE(completed_at, NOW())";
-  }
+  const isCompleted = fields.status === "COMPLETED";
 
   const sql = `
     UPDATE student_pskills
-    SET level = COALESCE($1, level),
-        status = COALESCE($2, status),
-        slot_id = COALESCE($3, slot_id),
-        completed_at = ${completedAtSql},
-        updated_at = NOW()
-    WHERE id = $4
-    RETURNING id, student_id, pskill_id, slot_id, level, status, completed_at, created_at, updated_at;
+    SET
+      completed = COALESCE($1, completed),
+      completed_at = CASE
+        WHEN $1 = true
+          THEN COALESCE(completed_at, NOW())
+        ELSE completed_at
+      END
+    WHERE id = $2
+    RETURNING
+      id,
+      student_id,
+      p_skill_level_id,
+      completed,
+      completed_at;
   `;
+
   const values = [
-    fields.level || null,
-    fields.status || null,
-    fields.slot_id !== undefined ? fields.slot_id : null,
+    fields.status !== undefined ? isCompleted : null,
     id,
   ];
+
   const result = await query(sql, values);
+
   return result.rows[0];
 };
+
+/* =========================================================
+   REMOVE STUDENT P-SKILL
+========================================================= */
 
 const removeStudentPSkill = async (id) => {
   const sql = `
     DELETE FROM student_pskills
     WHERE id = $1
-    RETURNING id, student_id, pskill_id, slot_id, level, status, completed_at, created_at, updated_at;
+    RETURNING
+      id,
+      student_id,
+      p_skill_level_id,
+      completed,
+      completed_at;
   `;
+
   const result = await query(sql, [id]);
+
   return result.rows[0];
 };
+
+/* =========================================================
+   EXPORTS
+========================================================= */
 
 module.exports = {
   findAllPSkills,
