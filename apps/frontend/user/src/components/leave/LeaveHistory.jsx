@@ -1,6 +1,6 @@
 import React from 'react'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, Clock } from 'lucide-react'
 import EmptyState from '../common/EmptyState'
 
 export default function LeaveHistory({ leaves }) {
@@ -15,37 +15,50 @@ export default function LeaveHistory({ leaves }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {leaves.map(lv => {
         const start = parseISO(lv.startDate)
         const end = parseISO(lv.endDate)
         const days = Math.round((end - start) / 86400000) + 1
+        
         return (
-          <div key={lv.id} className="card border border-gray-100">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center flex-shrink-0">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-text-primary">
-                    {format(start, 'dd MMM')} – {format(end, 'dd MMM yyyy')}
-                  </p>
-                  <p className="text-xs text-text-muted">{days} day{days !== 1 ? 's' : ''}</p>
-                </div>
+          <div key={lv.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 transition-all hover:shadow-md hover:border-primary/20 group">
+            {/* Calendar Tear-off Style Date */}
+            <div className="flex sm:flex-col items-center sm:w-20 bg-gray-50 rounded-xl border border-gray-200 overflow-hidden shrink-0">
+              <div className="bg-primary w-full text-center py-1.5 px-3 sm:px-0">
+                <span className="text-[10px] font-bold text-white uppercase tracking-wider">{format(start, 'MMM')}</span>
               </div>
-              <span className="px-2.5 py-1 rounded-badge bg-primary-light text-primary text-xs font-semibold flex-shrink-0">
-                Submitted
-              </span>
+              <div className="flex-1 text-center py-2 px-4 sm:px-0 bg-white">
+                <span className="text-xl sm:text-2xl font-black text-gray-900 leading-none">{format(start, 'dd')}</span>
+              </div>
+              {days > 1 && (
+                <div className="bg-gray-100 w-full text-center py-1 border-t border-gray-200 px-3 sm:px-0">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase">to {format(end, 'dd MMM')}</span>
+                </div>
+              )}
             </div>
 
-            <p className="text-xs text-text-secondary bg-background px-3 py-2 rounded-xl leading-relaxed">
-              {lv.reason}
-            </p>
+            <div className="flex-1 min-w-0 flex flex-col">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 group-hover:text-primary transition-colors">
+                    {days} Day{days !== 1 ? 's' : ''} Leave
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5 font-medium">
+                    <Clock className="w-3 h-3" />
+                    <span>Applied on {format(parseISO(lv.submittedOn), 'dd MMM yyyy')}</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold tracking-wide uppercase shadow-sm">
+                  Submitted
+                </span>
+              </div>
 
-            <p className="text-[10px] text-text-muted mt-2">
-              Applied on {format(parseISO(lv.submittedOn), 'dd MMM yyyy')}
-            </p>
+              <div className="mt-auto bg-gray-50/80 p-3 rounded-xl text-xs text-gray-700 leading-relaxed border border-gray-100">
+                <span className="font-semibold text-gray-900">Reason: </span>
+                {lv.reason}
+              </div>
+            </div>
           </div>
         )
       })}

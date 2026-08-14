@@ -1,15 +1,15 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  Calendar, MapPin, Sparkles, FileText, LayoutDashboard
+  Calendar, MapPin, FileText, LayoutDashboard, CalendarDays
 } from 'lucide-react'
 
 const BOTTOM_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { to: '/weekly-calendar', icon: Calendar, label: 'Weekly' },
+  { to: '/daily-plan', icon: CalendarDays, label: 'Daily Plan' },
   { to: '/movement-pass', icon: MapPin, label: 'Passes' },
-  { to: '/p-skills', icon: Sparkles, label: 'P-Skills' },
   { to: '/leave', icon: FileText, label: 'Leave' },
+  { to: '/weekly-calendar', icon: Calendar, label: 'Weekly' },
 ]
 
 export default function BottomNav() {

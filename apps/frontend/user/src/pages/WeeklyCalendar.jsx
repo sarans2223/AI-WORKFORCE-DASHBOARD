@@ -53,7 +53,7 @@ export default function WeeklyCalendar() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-8rem)] -m-4 sm:-m-8 p-4 sm:p-8 bg-background">
+    <div className="relative min-h-[calc(100vh-8rem)] -m-4 sm:-m-8 p-4 sm:p-8 bg-background overflow-x-hidden">
       {/* Decorative background blobs (Very subtle) */}
       <div className="absolute top-0 left-0 w-[40rem] h-[40rem] bg-primary-light/40 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-[40rem] h-[40rem] bg-primary-light/30 rounded-full blur-3xl pointer-events-none translate-x-1/3 translate-y-1/3" />
@@ -89,67 +89,69 @@ export default function WeeklyCalendar() {
           </div>
         </div>
 
-        {/* Responsive Week Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 lg:gap-4">
-          {weekDays.map(day => {
-            const dayActs = getActivitiesForDay(day)
-            const isTodayDate = isToday(day)
-            
-            return (
-              <div 
-                key={day.toISOString()} 
-                className={`flex lg:flex-col bg-white/30 backdrop-blur-md rounded-3xl p-3 sm:p-4 shadow-sm border border-white/50 transition-colors ${isTodayDate ? 'ring-2 ring-primary/20 bg-white/40' : 'hover:bg-white/40'}`}
-              >
-                {/* Day Header Box */}
-                <div className={`flex lg:flex-col items-center justify-center min-w-[4rem] px-3 lg:px-0 py-2.5 lg:mb-3 mr-4 lg:mr-0 rounded-2xl border transition-all shadow-sm flex-shrink-0 ${
-                  isTodayDate 
-                    ? 'bg-gradient-to-b from-primary to-primary-dark border-primary text-white shadow-primary/20' 
-                    : 'bg-white/80 border-white text-text-primary'
-                }`}>
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${isTodayDate ? 'text-white/80' : 'text-text-secondary'}`}>
-                    {format(day, 'EEE')}
-                  </span>
-                  <span className="text-xl font-black leading-none lg:mt-1 ml-2 lg:ml-0">
-                    {format(day, 'd')}
-                  </span>
-                </div>
+        {/* Responsive Week Grid Wrapper */}
+        <div className="w-full overflow-x-auto pb-2 scrollbar-hide">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 lg:gap-4">
+            {weekDays.map(day => {
+              const dayActs = getActivitiesForDay(day)
+              const isTodayDate = isToday(day)
+              
+              return (
+                <div 
+                  key={day.toISOString()} 
+                  className={`flex lg:flex-col bg-white/30 backdrop-blur-md rounded-3xl p-3 sm:p-4 shadow-sm border border-white/50 transition-colors ${isTodayDate ? 'ring-2 ring-primary/20 bg-white/40' : 'hover:bg-white/40'}`}
+                >
+                  {/* Day Header Box */}
+                  <div className={`flex lg:flex-col items-center justify-center min-w-[4rem] px-3 lg:px-0 py-2.5 lg:mb-3 mr-4 lg:mr-0 rounded-2xl border transition-all shadow-sm flex-shrink-0 ${
+                    isTodayDate 
+                      ? 'bg-gradient-to-b from-primary to-primary-dark border-primary text-white shadow-primary/20' 
+                      : 'bg-white/80 border-white text-text-primary'
+                  }`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isTodayDate ? 'text-white/80' : 'text-text-secondary'}`}>
+                      {format(day, 'EEE')}
+                    </span>
+                    <span className="text-xl font-black leading-none lg:mt-1 ml-2 lg:ml-0">
+                      {format(day, 'd')}
+                    </span>
+                  </div>
 
-                {/* Day Activities */}
-                <div className="flex-1 space-y-2.5">
-                  {dayActs.length === 0 ? (
-                    <div className="h-full min-h-[3.5rem] border-2 border-dashed border-primary/10 rounded-2xl flex items-center justify-center bg-white/20 p-2">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Empty</span>
-                    </div>
-                  ) : (
-                    dayActs
-                      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                      .map(act => {
-                        let accent = 'border-l-gray-300'
-                        if (act.status === 'COMPLETED') accent = 'border-l-success'
-                        if (act.status === 'IN_PROGRESS') accent = 'border-l-primary'
-                        if (act.status === 'INCOMPLETE') accent = 'border-l-danger'
+                  {/* Day Activities */}
+                  <div className="flex-1 space-y-2.5">
+                    {dayActs.length === 0 ? (
+                      <div className="h-full min-h-[3.5rem] border-2 border-dashed border-primary/10 rounded-2xl flex items-center justify-center bg-white/20 p-2">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Empty</span>
+                      </div>
+                    ) : (
+                      dayActs
+                        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                        .map(act => {
+                          let accent = 'border-l-gray-300'
+                          if (act.status === 'COMPLETED') accent = 'border-l-success'
+                          if (act.status === 'IN_PROGRESS') accent = 'border-l-primary'
+                          if (act.status === 'INCOMPLETE') accent = 'border-l-danger'
 
-                        return (
-                          <div 
-                            key={act.id} 
-                            className={`p-3 rounded-2xl bg-white border border-gray-100 hover:border-gray-200 shadow-[0_2px_10px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 cursor-pointer group border-l-[4px] ${accent}`}
-                            onClick={() => act.status !== 'COMPLETED' && !act.extendedEndTime ? setExtendActivity(act) : null}
-                            title={act.name}
-                          >
-                            <p className="text-xs font-bold leading-tight line-clamp-2 text-text-primary group-hover:text-primary transition-colors">{act.name}</p>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <span className="text-[10px] font-semibold text-text-secondary whitespace-nowrap">
-                                {act.startTime} – {act.extendedEndTime || act.endTime}
-                              </span>
+                          return (
+                            <div 
+                              key={act.id} 
+                              className={`p-3 rounded-2xl bg-white border border-gray-100 hover:border-gray-200 shadow-[0_2px_10px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 cursor-pointer group border-l-[4px] ${accent} min-w-[150px]`}
+                              onClick={() => act.status !== 'COMPLETED' && !act.extendedEndTime ? setExtendActivity(act) : null}
+                              title={act.name}
+                            >
+                              <p className="text-xs font-bold leading-tight line-clamp-2 text-text-primary group-hover:text-primary transition-colors break-words">{act.name}</p>
+                              <div className="flex items-center gap-1 mt-1.5">
+                                <span className="text-[10px] font-semibold text-text-secondary whitespace-nowrap">
+                                  {act.startTime} – {act.extendedEndTime || act.endTime}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })
-                  )}
+                          )
+                        })
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
 

@@ -43,8 +43,8 @@ export default function Sidebar({ open, onClose }) {
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-text-primary">EduTrack</p>
-              <p className="text-xs text-text-secondary">Student Portal</p>
+              <p className="text-sm font-bold text-text-primary">AI Workforce</p>
+              <p className="text-xs text-text-secondary">Management Portal</p>
             </div>
           </div>
           <button
@@ -74,7 +74,7 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-gray-100">
-          <p className="text-xs text-text-muted text-center">EduTrack v1.0</p>
+          <p className="text-xs text-text-muted text-center">AI Workforce v1.0</p>
         </div>
       </aside>
     </>

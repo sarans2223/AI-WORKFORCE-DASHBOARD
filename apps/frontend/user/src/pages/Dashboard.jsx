@@ -31,6 +31,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showMoreMobile, setShowMoreMobile] = useState(false)
+  const [showPastTasksModal, setShowPastTasksModal] = useState(false)
+
+  const handleCompleteTask = async (id) => {
+    await assignedTaskService.markCompleted(id)
+    setAssignedTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'COMPLETED' } : t))
+  }
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const greeting = () => {
@@ -85,34 +91,80 @@ export default function Dashboard() {
         <div className="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
       </div>
 
+      {/* Today's Attendance (Compact on Mobile) */}
+      <div className="card bg-white border border-gray-100 flex flex-row items-center justify-between gap-2 p-2.5 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary-light flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xs sm:text-sm font-bold text-text-primary">Today's Attendance</h2>
+            <p className="text-[10px] sm:text-xs text-text-muted hidden sm:block">Marked successfully for Forenoon</p>
+          </div>
+        </div>
+        <div className="flex flex-row gap-1.5 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between items-center bg-background px-2 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl sm:min-w-[140px]">
+            <span className="text-[9px] sm:text-sm font-semibold text-text-secondary sm:mr-4">Forenoon</span>
+            <span className="inline-flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-bold text-green-600">
+              <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Present</span>
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between items-center bg-background px-2 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl sm:min-w-[140px]">
+            <span className="text-[9px] sm:text-sm font-semibold text-text-secondary sm:mr-4">Afternoon</span>
+            <span className="inline-flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-bold text-text-muted">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Pending</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-4">
         
         {/* Left Column (Activities & Quick Access) */}
         <div className="lg:col-span-2 space-y-4">
           
-          {/* Quick links */}
+          {/* Assigned Tasks */}
           <div>
-            <h2 className="text-base font-bold text-text-primary mb-3">Quick Access</h2>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {QUICK_LINKS.map(({ to, icon: Icon, label, color }) => {
-                const colorMap = {
-                  primary: 'bg-primary-light text-primary',
-                  warning: 'bg-warning-soft text-amber-600',
-                  success: 'bg-success-soft text-green-600',
-                }
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    className="card flex flex-col items-center justify-center gap-2 py-4 px-1 sm:py-5 hover:shadow-card-hover transition-all duration-200 hover:-translate-y-0.5 text-center"
-                  >
-                    <div className={`p-2.5 sm:p-3 rounded-2xl ${colorMap[color]}`}>
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-text-primary">Assigned Tasks</h2>
+              <button onClick={() => setShowPastTasksModal(true)} className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary-dark transition-colors">
+                View Past <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="card">
+              {assignedTasks.filter(t => t.status === 'PENDING').length === 0 ? (
+                <div className="flex items-center gap-3 py-1">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
+                    <ClipboardList className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">No assigned tasks</p>
+                    <p className="text-xs text-text-muted mt-0.5">You're all caught up!</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {assignedTasks.filter(t => t.status === 'PENDING').map(task => (
+                    <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background p-3 rounded-xl hover:shadow-md cursor-pointer transition-all border border-transparent hover:border-primary/20 group">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <AlertCircle className="w-4 h-4 text-warning" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-text-primary">{task.title}</p>
+                          <p className="text-xs text-text-muted mt-0.5">Assigned by {task.assignedBy} • Due {task.dueDate}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleCompleteTask(task.id); }} 
+                        className="self-end sm:self-auto shrink-0 px-3 py-1.5 bg-primary-light text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-white transition-colors flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+                      </button>
                     </div>
-                    <span className="text-[10px] sm:text-xs font-semibold text-text-primary leading-tight">{label}</span>
-                  </Link>
-                )
-              })}
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -214,61 +266,31 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Simple Attendance */}
-          <div>
-            <h2 className="text-base font-bold text-text-primary mb-3">Today's Attendance</h2>
-            <div className="card space-y-3">
-              <div className="flex justify-between items-center bg-background px-4 py-3 rounded-xl">
-                <span className="text-sm font-semibold text-text-secondary">Forenoon</span>
-                <span className="inline-flex items-center gap-1 text-sm font-bold text-green-600">
-                  <CheckCircle2 className="w-4 h-4" /> Present
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-background px-4 py-3 rounded-xl">
-                <span className="text-sm font-semibold text-text-secondary">Afternoon</span>
-                {/* Mocking afternoon as not marked or present based on time */}
-                <span className="inline-flex items-center gap-1 text-sm font-bold text-text-muted">
-                  <Clock className="w-4 h-4" /> Not marked
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Assigned Tasks */}
+
+          {/* Quick links */}
           <div>
-            <h2 className="text-base font-bold text-text-primary mb-3">Assigned Tasks</h2>
-            <div className="card">
-              {assignedTasks.length === 0 ? (
-                <div className="text-center py-6">
-                  <ClipboardList className="w-8 h-8 text-primary-light mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-text-primary">No assigned tasks</p>
-                  <p className="text-xs text-text-muted mt-1">You're all caught up!</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {assignedTasks.map(task => (
-                    <div key={task.id} className="flex items-start gap-3 bg-background p-3 rounded-xl">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {task.status === 'COMPLETED' ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        ) : task.status === 'PENDING' ? (
-                          <AlertCircle className="w-4 h-4 text-warning" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-danger" />
-                        )}
-                      </div>
-                      <div>
-                        <p className={`text-sm font-semibold ${task.status === 'COMPLETED' ? 'text-text-secondary line-through' : 'text-text-primary'}`}>
-                          {task.title}
-                        </p>
-                        <p className="text-xs text-text-muted mt-0.5">
-                          Assigned by {task.assignedBy} • Due {task.dueDate}
-                        </p>
-                      </div>
+            <h2 className="text-base font-bold text-text-primary mb-3">Quick Access</h2>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {QUICK_LINKS.map(({ to, icon: Icon, label, color }) => {
+                const colorMap = {
+                  primary: 'bg-primary-light text-primary',
+                  warning: 'bg-warning-soft text-amber-600',
+                  success: 'bg-success-soft text-green-600',
+                }
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className="card flex flex-col items-center justify-center gap-2 py-4 px-1 sm:py-5 hover:shadow-card-hover transition-all duration-200 hover:-translate-y-0.5 text-center"
+                  >
+                    <div className={`p-2.5 sm:p-3 rounded-2xl ${colorMap[color]}`}>
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                  ))}
-                </div>
-              )}
+                    <span className="text-[10px] sm:text-xs font-semibold text-text-primary leading-tight">{label}</span>
+                  </Link>
+                )
+              })}
             </div>
           </div>
 
@@ -311,6 +333,34 @@ export default function Dashboard() {
           </div>
         </Modal>
       )}
+
+      {/* Past Assigned Tasks Modal */}
+      <Modal open={showPastTasksModal} onClose={() => setShowPastTasksModal(false)} title="Past Assignments" size="md">
+        <div className="space-y-3">
+          {assignedTasks.filter(t => t.status === 'COMPLETED').length === 0 ? (
+            <div className="text-center py-6">
+              <ClipboardList className="w-8 h-8 text-primary-light mx-auto mb-2" />
+              <p className="text-sm font-semibold text-text-primary">No completed tasks yet</p>
+            </div>
+          ) : (
+            assignedTasks.filter(t => t.status === 'COMPLETED').map(task => (
+              <div key={task.id} className="flex items-start gap-3 bg-background p-3 rounded-xl border border-gray-100">
+                <div className="flex-shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text-secondary line-through">
+                    {task.title}
+                  </p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Assigned by {task.assignedBy} • Due {task.dueDate}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }
