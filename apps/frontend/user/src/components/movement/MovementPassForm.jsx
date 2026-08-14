@@ -19,13 +19,41 @@ export default function MovementPassForm({ onSubmit }) {
   const validate = () => {
     const e = {}
     if (!form.date) e.date = 'Date required'
+    else if (form.date < today) e.date = 'Past dates are not allowed'
+
     if (!form.movementType) e.movementType = 'Movement type required'
     
+    const currentTime = format(new Date(), 'HH:mm')
+
     if (form.movementType === 'PS slot') {
-      if (!form.slot) e.slot = 'Slot required'
+      if (!form.slot) {
+        e.slot = 'Slot required'
+      } else if (form.date === today) {
+        const startStr = form.slot.split(' - ')[0]
+        const isPM = startStr.includes('PM')
+        let [hours, mins] = startStr.replace(/(AM|PM)/, '').trim().split('.')
+        let h = parseInt(hours, 10)
+        if (isPM && h !== 12) h += 12
+        if (!isPM && h === 12) h = 0
+        const slotTime = `${String(h).padStart(2, '0')}:${mins}`
+        
+        if (slotTime < currentTime) {
+          e.slot = 'Cannot select a past time slot for today'
+        }
+      }
     } else if (form.movementType) {
-      if (!form.fromTime) e.fromTime = 'From time required'
-      if (!form.toTime) e.toTime = 'To time required'
+      if (!form.fromTime) {
+        e.fromTime = 'From time required'
+      } else if (form.date === today && form.fromTime < currentTime) {
+        e.fromTime = 'Cannot select a past time'
+      }
+      
+      if (!form.toTime) {
+        e.toTime = 'To time required'
+      } else if (form.fromTime && form.toTime <= form.fromTime) {
+        e.toTime = 'To time must be after from time'
+      }
+      
       if (!form.reason.trim()) e.reason = 'Reason required'
     }
     return e
@@ -74,6 +102,7 @@ export default function MovementPassForm({ onSubmit }) {
           type="date"
           className={`input ${errors.date ? 'border-danger' : ''}`}
           value={form.date}
+          min={today}
           onChange={set('date')}
         />
         {errors.date && <p className="text-xs text-danger mt-1">{errors.date}</p>}

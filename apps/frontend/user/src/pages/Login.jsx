@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth()
-  const [form, setForm] = useState({ email: 'priya@college.edu', password: 'student123' })
+  const [form, setForm] = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -37,13 +37,13 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-card">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary">EduTrack</h1>
-          <p className="text-text-secondary mt-1">Student Activity Portal</p>
+          <h1 className="text-3xl font-bold text-text-primary">AI Workforce</h1>
+          <p className="text-text-secondary mt-1">Management Portal</p>
         </div>
 
         {/* Card */}
         <div className="card shadow-modal">
-          <h2 className="text-xl font-bold text-text-primary mb-6">Welcome back 👋</h2>
+          <h2 className="text-xl font-bold text-text-primary mb-6">Welcome back</h2>
 
           {error && (
             <div className="mb-4 px-4 py-3 bg-danger-soft rounded-xl text-sm text-red-700 font-medium">
@@ -104,12 +104,7 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Demo hint */}
-          <div className="mt-5 pt-4 border-t border-gray-100">
-            <p className="text-xs text-text-muted text-center">
-              Demo credentials are pre-filled — just click Sign In
-            </p>
-          </div>
+
         </div>
       </div>
     </div>

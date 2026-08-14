@@ -28,10 +28,23 @@ export default function ActivityForm({ open, onClose, onSave, editActivity = nul
   const validate = () => {
     const e = {}
     if (!form.name.trim()) e.name = 'Activity name is required'
-    if (!form.startTime) e.startTime = 'Start time is required'
-    if (!form.endTime) e.endTime = 'End time is required'
-    if (form.startTime && form.endTime && form.startTime >= form.endTime)
+    
+    if (form.date < today) e.date = 'Past dates are not allowed'
+
+    const currentTime = format(new Date(), 'HH:mm')
+    
+    if (!form.startTime) {
+      e.startTime = 'Start time is required'
+    } else if (form.date === today && form.startTime < currentTime) {
+      e.startTime = 'Cannot select a past time'
+    }
+    
+    if (!form.endTime) {
+      e.endTime = 'End time is required'
+    } else if (form.startTime && form.endTime && form.startTime >= form.endTime) {
       e.endTime = 'End time must be after start time'
+    }
+    
     return e
   }
 
@@ -79,11 +92,13 @@ export default function ActivityForm({ open, onClose, onSave, editActivity = nul
           <input
             id="activity-date-input"
             type="date"
-            className="input"
+            className={`input ${errors.date ? 'border-danger' : ''} ${editActivity ? 'bg-gray-100 cursor-not-allowed text-text-muted opacity-70' : ''}`}
             value={form.date}
             min={today}
             onChange={set('date')}
+            disabled={!!editActivity}
           />
+          {errors.date && <p className="text-xs text-danger mt-1">{errors.date}</p>}
         </div>
 
         {/* Times */}
@@ -93,9 +108,10 @@ export default function ActivityForm({ open, onClose, onSave, editActivity = nul
             <input
               id="activity-start-time"
               type="time"
-              className={`input ${errors.startTime ? 'border-danger' : ''}`}
+              className={`input ${errors.startTime ? 'border-danger' : ''} ${editActivity ? 'bg-gray-100 cursor-not-allowed text-text-muted opacity-70' : ''}`}
               value={form.startTime}
               onChange={set('startTime')}
+              disabled={!!editActivity}
             />
             {errors.startTime && <p className="text-xs text-danger mt-1">{errors.startTime}</p>}
           </div>
@@ -104,9 +120,10 @@ export default function ActivityForm({ open, onClose, onSave, editActivity = nul
             <input
               id="activity-end-time"
               type="time"
-              className={`input ${errors.endTime ? 'border-danger' : ''}`}
+              className={`input ${errors.endTime ? 'border-danger' : ''} ${editActivity ? 'bg-gray-100 cursor-not-allowed text-text-muted opacity-70' : ''}`}
               value={form.endTime}
               onChange={set('endTime')}
+              disabled={!!editActivity}
             />
             {errors.endTime && <p className="text-xs text-danger mt-1">{errors.endTime}</p>}
           </div>

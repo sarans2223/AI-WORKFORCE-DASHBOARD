@@ -12,6 +12,8 @@ export default function LeaveForm({ onSubmit }) {
   const validate = () => {
     const e = {}
     if (!form.startDate) e.startDate = 'Start date required'
+    else if (form.startDate < today) e.startDate = 'Start date cannot be in the past'
+    
     if (!form.endDate) e.endDate = 'End date required'
     if (form.startDate && form.endDate && form.endDate < form.startDate)
       e.endDate = 'End date must be on or after start date'
