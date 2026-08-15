@@ -116,9 +116,9 @@ export default function WeeklyCalendar() {
                   </div>
 
                   {/* Day Activities */}
-                  <div className="flex-1 space-y-2.5">
+                  <div className="flex-1 flex flex-col items-center space-y-2.5 w-full">
                     {dayActs.length === 0 ? (
-                      <div className="h-full min-h-[3.5rem] border-2 border-dashed border-primary/10 rounded-2xl flex items-center justify-center bg-white/20 p-2">
+                      <div className="min-h-[3.5rem] min-w-[150px] border-2 border-dashed border-primary/10 rounded-2xl flex items-center justify-center bg-white/20 p-2">
                         <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Empty</span>
                       </div>
                     ) : (
