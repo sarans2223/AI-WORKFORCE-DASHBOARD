@@ -10,12 +10,14 @@ export const leaveService = {
     return [...leaves].sort((a, b) => b.submittedOn.localeCompare(a.submittedOn))
   },
 
-  apply: async ({ startDate, endDate, reason }) => {
+  apply: async ({ startDate, endDate, reason, fromTime, toTime }) => {
     await delay()
     const newLeave = {
       id: `lv-${Date.now()}`,
       startDate,
       endDate,
+      fromTime: fromTime || '',
+      toTime: toTime || '',
       reason,
       submittedOn: format(new Date(), 'yyyy-MM-dd'),
     }

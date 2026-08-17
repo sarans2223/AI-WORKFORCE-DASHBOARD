@@ -346,7 +346,7 @@ export default function Assign() {
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5
               ${activeTab === 'projects' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
           >
-            <FolderKanban className="w-4 h-4" /> Projects
+            <FolderKanban className="w-4 h-4" /> Team Project
           </button>
         </div>
       </div>

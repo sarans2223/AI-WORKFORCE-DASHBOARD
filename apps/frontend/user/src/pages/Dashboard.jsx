@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CalendarDays, FileText, MapPin, CheckCircle2, Clock, Plus, ArrowRight,
-  ClipboardList, AlertCircle, XCircle
+  ClipboardList, AlertCircle, XCircle, Send, Info
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 import StatusBadge from '../components/common/StatusBadge'
 import ProgressIndicator from '../components/common/ProgressIndicator'
 import Modal from '../components/common/Modal'
@@ -28,14 +28,50 @@ export default function Dashboard() {
   const [assignedTasks, setAssignedTasks] = useState([])
   const [profile, setProfile] = useState(null)
   const [project, setProject] = useState(null)
+  const [updates, setUpdates] = useState([])
   const [loading, setLoading] = useState(true)
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [showMoreMobile, setShowMoreMobile] = useState(false)
   const [showPastTasksModal, setShowPastTasksModal] = useState(false)
+
+  // Project Updates Modal Tabs & Posting State
+  const [modalTab, setModalTab] = useState('details')
+  const [isPosting, setIsPosting] = useState(false)
+  const [newUpdateContent, setNewUpdateContent] = useState('')
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false)
 
   const handleCompleteTask = async (id) => {
     await assignedTaskService.markCompleted(id)
     setAssignedTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'COMPLETED' } : t))
+  }
+
+  const handlePostUpdate = async (e) => {
+    e.preventDefault()
+    if (!newUpdateContent.trim()) return
+    setIsSubmittingUpdate(true)
+    try {
+      const authorName = profile?.name || user?.name || 'Priya Ramesh'
+      const authorRole = 'Member'
+      const newUpd = await projectService.addUpdate({
+        author: authorName,
+        role: authorRole,
+        content: newUpdateContent
+      })
+      setUpdates(prev => [newUpd, ...prev])
+      setNewUpdateContent('')
+      setIsPosting(false)
+      setModalTab('history')
+    } catch (error) {
+      console.error("Failed to post update", error)
+    } finally {
+      setIsSubmittingUpdate(false)
+    }
+  }
+
+  const handleCloseProjectModal = () => {
+    setShowProjectModal(false)
+    setModalTab('details')
+    setIsPosting(false)
+    setNewUpdateContent('')
   }
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -52,13 +88,15 @@ export default function Dashboard() {
       movementService.getAll(),
       assignedTaskService.getAll(),
       profileService.get(),
-      projectService.get()
-    ]).then(([acts, passes, tasks, prof, proj]) => {
+      projectService.get(),
+      projectService.getUpdates()
+    ]).then(([acts, passes, tasks, prof, proj, upds]) => {
       setTodayActivities(acts)
       setActivePass(passes.find(p => p.status === 'ACTIVE' || p.date === todayStr))
       setAssignedTasks(tasks)
       setProfile(prof || user)
       setProject(proj)
+      setUpdates(upds)
       setLoading(false)
     })
   }, [todayStr, user])
@@ -67,6 +105,229 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  const renderMyProjectCard = () => {
+    return (
+      <div>
+        <h2 className="text-base font-bold text-text-primary mb-3">My Team</h2>
+        {project ? (
+          <button
+            onClick={() => { setModalTab('details'); setShowProjectModal(true); }}
+            className="w-full card bg-primary-light border border-primary/20 hover:border-primary transition-all duration-200 text-left flex items-start justify-between gap-4"
+          >
+            <div className="space-y-1 flex-1">
+              <p className="text-[10px] font-black text-primary uppercase tracking-wide">Team: {project.teamId}</p>
+              <p className="text-base font-bold text-text-primary mt-0.5 leading-snug">{project.title}</p>
+              <div className="pt-2 border-t border-primary/10 mt-2 space-y-1 text-xs">
+                <p className="text-text-primary font-medium">
+                  <span className="font-bold text-primary">Lead:</span> {project.lead}
+                </p>
+                <p className="text-text-secondary font-medium">
+                  <span className="font-bold text-text-primary">Members:</span> {project.members.join(', ')}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 bg-white rounded-xl flex-shrink-0 mt-1">
+              <ArrowRight className="w-4 h-4 text-primary" />
+            </div>
+          </button>
+        ) : (
+          <div className="w-full card bg-gray-50 border border-gray-150 p-4 text-center">
+            <p className="text-xs font-black text-text-muted uppercase tracking-wider">Project Title</p>
+            <p className="text-sm font-bold text-text-secondary mt-1">Not Assigned</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderAssignedTasks = () => {
+    const pendingTasks = assignedTasks.filter(t => t.status === 'PENDING')
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-text-primary">Assigned Tasks</h2>
+          <button onClick={() => setShowPastTasksModal(true)} className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary-dark transition-colors">
+            View Past <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="card">
+          {pendingTasks.length === 0 ? (
+            <div className="flex items-center gap-3 py-1">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
+                <ClipboardList className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-text-primary">No assigned tasks</p>
+                <p className="text-xs text-text-muted mt-0.5">You're all caught up!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingTasks.map(task => (
+                <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background p-3 rounded-xl hover:shadow-md cursor-pointer transition-all border border-transparent hover:border-primary/20 group">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <AlertCircle className="w-4 h-4 text-warning" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">{task.title}</p>
+                      <p className="text-xs text-text-muted mt-0.5">Assigned by {task.assignedBy} • Due {task.dueDate}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleCompleteTask(task.id); }} 
+                    className="self-end sm:self-auto shrink-0 px-3 py-1.5 bg-primary-light text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-white transition-colors flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderActivePass = () => {
+    return (
+      <div>
+        <h2 className="text-base font-bold text-text-primary mb-3">Active Movement Pass</h2>
+        <div className="card bg-success-soft border border-green-100">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-green-800">{activePass.movementType}</p>
+              <p className="text-xs text-green-700 font-medium mt-0.5">{activePass.timing}</p>
+            </div>
+          </div>
+          <div className="bg-white/60 px-3 py-2 rounded-xl mt-3">
+            <p className="text-xs text-green-800">{activePass.reason}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderAssignedTasksWithFallback = () => {
+    const pendingTasks = assignedTasks.filter(t => t.status === 'PENDING')
+    if (pendingTasks.length > 0) {
+      return renderAssignedTasks()
+    }
+    if (activePass) {
+      return (
+        <div>
+          <h2 className="text-base font-bold text-text-primary mb-3">Active Movement Pass</h2>
+          <div className="card bg-success-soft border border-green-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-green-800 font-semibold uppercase tracking-wide">Active Pass (No pending tasks)</p>
+                <p className="text-sm font-bold text-green-800 mt-0.5">{activePass.movementType}</p>
+                <p className="text-xs text-green-700 font-medium mt-0.5">{activePass.timing}</p>
+              </div>
+            </div>
+            <div className="bg-white/60 px-3 py-2 rounded-xl mt-3">
+              <p className="text-xs text-green-800">{activePass.reason}</p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return renderAssignedTasks()
+  }
+
+  const renderTodayActivities = () => {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-text-primary">Today's Activities</h2>
+          <Link to="/daily-plan" className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary-dark transition-colors">
+            View all <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {todayActivities.length === 0 ? (
+          <div className="card text-center py-10">
+            <CalendarDays className="w-10 h-10 text-primary-light mx-auto mb-3" />
+            <p className="text-sm font-semibold text-text-primary">No activities today</p>
+            <p className="text-xs text-text-muted mt-1">Head to Daily Plan to add your first activity</p>
+            <Link to="/daily-plan" className="btn-primary inline-flex items-center gap-2 mt-4 text-sm">
+              <Plus className="w-4 h-4" />
+              Add Activity
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {todayActivities.slice(0, 3).map(act => (
+              <div key={act.id} className="card border border-gray-100">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-text-primary leading-snug">{act.name}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">{act.startTime} – {act.extendedEndTime || act.endTime}</p>
+                  </div>
+                  <StatusBadge status={act.status} />
+                </div>
+                <ProgressIndicator value={act.progress} />
+              </div>
+            ))}
+            {todayActivities.length > 3 && (
+              <Link to="/daily-plan" className="block text-center py-3 text-sm text-primary font-semibold hover:text-primary-dark transition-colors">
+                +{todayActivities.length - 3} more activities →
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderProjectUpdatesWidget = () => {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-text-primary">Project Updates</h2>
+          <button 
+            onClick={() => { setModalTab('history'); setShowProjectModal(true); }} 
+            className="text-xs text-primary font-semibold hover:text-primary-dark transition-colors flex items-center gap-0.5"
+          >
+            View History <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="card space-y-3">
+          {updates.length === 0 ? (
+            <div className="text-center py-6 text-text-muted text-xs">
+              No updates posted yet
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 -my-2.5">
+              {updates.slice(0, 3).map((upd) => (
+                <div key={upd.id} className="py-2.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <div className="w-5 h-5 rounded-full bg-primary-light text-primary flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                      {upd.avatar}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-text-primary truncate max-w-[120px] inline-block align-middle">{upd.author}</p>
+                      <span className="text-[9px] text-text-muted ml-1.5 inline-block align-middle">{formatDistanceToNow(new Date(upd.timestamp), { addSuffix: true })}</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-text-secondary line-clamp-2 leading-relaxed pl-6">
+                    {upd.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -118,219 +379,179 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        
-        {/* Left Column (Activities & Quick Access) */}
+      {/* Desktop Layout */}
+      <div className="hidden lg:grid lg:grid-cols-3 gap-4 animate-fade-in">
+        {/* Desktop Left Column */}
         <div className="lg:col-span-2 space-y-4">
-          
-          {/* Assigned Tasks */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-text-primary">Assigned Tasks</h2>
-              <button onClick={() => setShowPastTasksModal(true)} className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary-dark transition-colors">
-                View Past <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="card">
-              {assignedTasks.filter(t => t.status === 'PENDING').length === 0 ? (
-                <div className="flex items-center gap-3 py-1">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
-                    <ClipboardList className="w-5 h-5 text-gray-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">No assigned tasks</p>
-                    <p className="text-xs text-text-muted mt-0.5">You're all caught up!</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {assignedTasks.filter(t => t.status === 'PENDING').map(task => (
-                    <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background p-3 rounded-xl hover:shadow-md cursor-pointer transition-all border border-transparent hover:border-primary/20 group">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-0.5">
-                          <AlertCircle className="w-4 h-4 text-warning" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-text-primary">{task.title}</p>
-                          <p className="text-xs text-text-muted mt-0.5">Assigned by {task.assignedBy} • Due {task.dueDate}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleCompleteTask(task.id); }} 
-                        className="self-end sm:self-auto shrink-0 px-3 py-1.5 bg-primary-light text-primary text-xs font-bold rounded-lg hover:bg-primary hover:text-white transition-colors flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Complete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Project Card */}
-          {project && (
-            <div>
-              <h2 className="text-base font-bold text-text-primary mb-3">My Project</h2>
-              <button
-                onClick={() => setShowProjectModal(true)}
-                className="w-full card bg-primary-light border border-primary/20 hover:border-primary transition-all duration-200 text-left flex items-start justify-between gap-4"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">Team: {project.teamId}</p>
-                  <p className="text-lg font-bold text-text-primary mt-0.5">{project.title}</p>
-                  <p className="text-sm text-text-secondary mt-1 line-clamp-1">{project.description}</p>
-                </div>
-                <div className="p-2 bg-white rounded-xl flex-shrink-0">
-                  <ArrowRight className="w-5 h-5 text-primary" />
-                </div>
-              </button>
-            </div>
-          )}
-
-          {/* Today's activities */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-text-primary">Today's Activities</h2>
-              <Link to="/daily-plan" className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary-dark transition-colors">
-                View all <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            {todayActivities.length === 0 ? (
-              <div className="card text-center py-10">
-                <CalendarDays className="w-10 h-10 text-primary-light mx-auto mb-3" />
-                <p className="text-sm font-semibold text-text-primary">No activities today</p>
-                <p className="text-xs text-text-muted mt-1">Head to Daily Plan to add your first activity</p>
-                <Link to="/daily-plan" className="btn-primary inline-flex items-center gap-2 mt-4 text-sm">
-                  <Plus className="w-4 h-4" />
-                  Add Activity
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {todayActivities.slice(0, 3).map(act => (
-                  <div key={act.id} className="card border border-gray-100">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-text-primary leading-snug">{act.name}</p>
-                        <p className="text-xs text-text-secondary mt-0.5">{act.startTime} – {act.extendedEndTime || act.endTime}</p>
-                      </div>
-                      <StatusBadge status={act.status} />
-                    </div>
-                    <ProgressIndicator value={act.progress} />
-                  </div>
-                ))}
-                {todayActivities.length > 3 && (
-                  <Link to="/daily-plan" className="block text-center py-3 text-sm text-primary font-semibold hover:text-primary-dark transition-colors">
-                    +{todayActivities.length - 3} more activities →
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
+          {renderAssignedTasks()}
+          {renderTodayActivities()}
         </div>
-
-        {/* Mobile View More Toggle */}
-        <div className="lg:hidden">
-          <button
-            onClick={() => setShowMoreMobile(!showMoreMobile)}
-            className="w-full py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-text-primary shadow-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
-          >
-            {showMoreMobile ? 'Show Less Details' : 'View More Dashboard Details'}
-            <ArrowRight className={`w-4 h-4 transition-transform duration-300 ${showMoreMobile ? '-rotate-90' : 'rotate-90'}`} />
-          </button>
+        {/* Desktop Right Column */}
+        <div className="space-y-4">
+          {activePass && renderActivePass()}
+          {renderMyProjectCard()}
+          {renderProjectUpdatesWidget()}
         </div>
+      </div>
 
-        {/* Right Column (Tasks, Attendance, Movement Pass) */}
-        <div className={`space-y-4 ${showMoreMobile ? 'block' : 'hidden lg:block'}`}>
-          
-          {/* Active Movement Pass */}
-          {activePass && (
-            <div>
-              <h2 className="text-base font-bold text-text-primary mb-3">Active Movement Pass</h2>
-              <div className="card bg-success-soft border border-green-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-green-800">{activePass.movementType}</p>
-                    <p className="text-xs text-green-700 font-medium mt-0.5">{activePass.timing}</p>
-                  </div>
-                </div>
-                <div className="bg-white/60 px-3 py-2 rounded-xl mt-3">
-                  <p className="text-xs text-green-800">{activePass.reason}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-
-          {/* Quick links */}
-          <div>
-            <h2 className="text-base font-bold text-text-primary mb-3">Quick Access</h2>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {QUICK_LINKS.map(({ to, icon: Icon, label, color }) => {
-                const colorMap = {
-                  primary: 'bg-primary-light text-primary',
-                  warning: 'bg-warning-soft text-amber-600',
-                  success: 'bg-success-soft text-green-600',
-                }
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    className="card flex flex-col items-center justify-center gap-2 py-4 px-1 sm:py-5 hover:shadow-card-hover transition-all duration-200 hover:-translate-y-0.5 text-center"
-                  >
-                    <div className={`p-2.5 sm:p-3 rounded-2xl ${colorMap[color]}`}>
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-semibold text-text-primary leading-tight">{label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-
-        </div>
+      {/* Responsive/Mobile Layout */}
+      <div className="lg:hidden space-y-4 animate-fade-in">
+        {renderMyProjectCard()}
+        {renderAssignedTasksWithFallback()}
+        {renderTodayActivities()}
+        {renderProjectUpdatesWidget()}
       </div>
 
       {/* Project Modal */}
       {project && (
-        <Modal open={showProjectModal} onClose={() => setShowProjectModal(false)} title="Project Details" size="md">
-          <div className="space-y-4">
-            <div>
-              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Project Title</p>
-              <p className="text-base font-bold text-text-primary">{project.title}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Description</p>
-              <p className="text-sm text-text-secondary leading-relaxed">{project.description}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-background rounded-xl p-3">
-                <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Team ID</p>
-                <p className="text-sm font-bold text-text-primary">{project.teamId}</p>
-              </div>
-              <div className="bg-background rounded-xl p-3">
-                <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Lead</p>
-                <p className="text-sm font-bold text-text-primary">{project.lead}</p>
-              </div>
-            </div>
-            <div className="bg-background rounded-xl p-3">
-              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-2">Members</p>
-              <ul className="space-y-1">
-                {project.members.map((member, i) => (
-                  <li key={i} className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                    {member}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <Modal open={showProjectModal} onClose={handleCloseProjectModal} title="Project Details" size="md">
+          {/* Modal Tabs */}
+          <div className="flex border-b border-gray-100 mb-4 -mx-6 px-6">
+            <button
+              onClick={() => { setModalTab('details'); setIsPosting(false); }}
+              className={`pb-2 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+                modalTab === 'details' && !isPosting
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Details
+            </button>
+            <button
+              onClick={() => { setModalTab('history'); setIsPosting(false); }}
+              className={`pb-2 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 ${
+                modalTab === 'history'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              History
+              {updates.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  modalTab === 'history' ? 'bg-primary-light text-primary' : 'bg-gray-100 text-text-secondary'
+                }`}>
+                  {updates.length}
+                </span>
+              )}
+            </button>
           </div>
+
+          {modalTab === 'details' ? (
+            !isPosting ? (
+              <div className="space-y-4 animate-scale-in">
+                <div>
+                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Project Title</p>
+                  <p className="text-base font-bold text-text-primary">{project.title}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Description</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">{project.description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-background rounded-xl p-3">
+                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Team ID</p>
+                    <p className="text-sm font-bold text-text-primary">{project.teamId}</p>
+                  </div>
+                  <div className="bg-background rounded-xl p-3">
+                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">Lead</p>
+                    <p className="text-sm font-bold text-text-primary">{project.lead}</p>
+                  </div>
+                </div>
+                <div className="bg-background rounded-xl p-3">
+                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-2">Members</p>
+                  <ul className="space-y-1">
+                    {project.members.map((member, i) => (
+                      <li key={i} className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        {member}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setIsPosting(true)}
+                    className="w-full btn-primary flex items-center justify-center gap-1.5 text-xs py-2.5"
+                  >
+                    <Plus className="w-4 h-4" /> Post Update
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handlePostUpdate} className="space-y-4 animate-scale-in">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-text-primary">Post Project Update</h3>
+                  <span className="text-[10px] text-text-muted">Posting as {profile?.name || user?.name || 'Priya Ramesh'}</span>
+                </div>
+                
+                <div>
+                  <label htmlFor="update-content" className="label">Update Message</label>
+                  <textarea
+                    id="update-content"
+                    className="input min-h-[120px] resize-none text-xs leading-relaxed"
+                    placeholder="Describe your progress or update details..."
+                    value={newUpdateContent}
+                    onChange={(e) => setNewUpdateContent(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsPosting(false); setNewUpdateContent(''); }}
+                    className="flex-1 btn-secondary text-xs py-2.5"
+                    disabled={isSubmittingUpdate}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 btn-primary text-xs py-2.5 flex items-center justify-center gap-1.5"
+                    disabled={isSubmittingUpdate || !newUpdateContent.trim()}
+                  >
+                    {isSubmittingUpdate ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" /> Post Update
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )
+          ) : (
+            <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-1 animate-scale-in">
+              {updates.length === 0 ? (
+                <div className="text-center py-8 text-text-muted text-sm">
+                  No updates found in this project.
+                </div>
+              ) : (
+                updates.map((upd) => (
+                  <div key={upd.id} className="flex gap-3 bg-background p-3 rounded-xl border border-gray-100/50">
+                    <div className="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                      {upd.avatar}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                        <div>
+                          <span className="text-xs font-bold text-text-primary">{upd.author}</span>
+                          <span className="text-[10px] text-text-muted font-semibold ml-1.5">({upd.role})</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
+                        {upd.content}
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-1.5 font-medium">
+                        {formatDistanceToNow(new Date(upd.timestamp), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </Modal>
       )}
 
