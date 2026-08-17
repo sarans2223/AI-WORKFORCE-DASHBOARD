@@ -10,7 +10,7 @@ export const movementService = {
     return [...passes].sort((a, b) => b.date.localeCompare(a.date))
   },
 
-  create: async ({ date, movementType, slot, reason }) => {
+  create: async ({ date, movementType, slot, reason, skillName }) => {
     await delay()
     const timing = PSKILL_SLOTS[slot]?.timing || slot.replace(/^.+?\((.+)\)$/, '$1')
     const newPass = {
@@ -20,6 +20,7 @@ export const movementService = {
       slot,
       timing,
       reason,
+      skillName: skillName || '',
     }
     passes = [newPass, ...passes]
     return newPass

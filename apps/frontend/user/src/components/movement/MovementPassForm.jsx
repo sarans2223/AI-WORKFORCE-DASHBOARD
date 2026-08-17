@@ -10,7 +10,7 @@ const PS_TIMINGS = ['8.45 AM - 9.45 AM', '10.00 AM - 11.00 AM', '11.20 AM - 12.2
 
 export default function MovementPassForm({ onSubmit }) {
   const [form, setForm] = useState({
-    date: today, movementType: '', slot: '', fromTime: '', toTime: '', reason: '',
+    date: today, movementType: '', slot: '', fromTime: '', toTime: '', reason: '', skillName: '',
   })
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
@@ -26,6 +26,9 @@ export default function MovementPassForm({ onSubmit }) {
     const currentTime = format(new Date(), 'HH:mm')
 
     if (form.movementType === 'PS slot') {
+      if (!form.skillName.trim()) {
+        e.skillName = 'Skill name required'
+      }
       if (!form.slot) {
         e.slot = 'Slot required'
       } else if (form.date === today) {
@@ -70,11 +73,12 @@ export default function MovementPassForm({ onSubmit }) {
         movementType: form.movementType,
         slot: form.movementType === 'PS slot' ? form.slot : 'Custom Time',
         timing: form.movementType === 'PS slot' ? form.slot : `${form.fromTime} - ${form.toTime}`,
-        reason: form.movementType === 'PS slot' ? 'Attending P-Skill Session' : form.reason,
+        reason: form.movementType === 'PS slot' ? `Attending P-Skill Session: ${form.skillName}` : form.reason,
+        skillName: form.movementType === 'PS slot' ? form.skillName : '',
       }
       await onSubmit(payload)
       setSuccess(true)
-      setForm({ date: today, movementType: '', slot: '', fromTime: '', toTime: '', reason: '' })
+      setForm({ date: today, movementType: '', slot: '', fromTime: '', toTime: '', reason: '', skillName: '' })
       setTimeout(() => setSuccess(false), 3000)
     } finally {
       setSaving(false)
@@ -116,7 +120,7 @@ export default function MovementPassForm({ onSubmit }) {
           className={`input ${errors.movementType ? 'border-danger' : ''}`}
           value={form.movementType}
           onChange={(e) => {
-            setForm(f => ({ ...f, movementType: e.target.value, slot: '', fromTime: '', toTime: '', reason: '' }))
+            setForm(f => ({ ...f, movementType: e.target.value, slot: '', fromTime: '', toTime: '', reason: '', skillName: '' }))
             setErrors({})
           }}
         >
@@ -128,18 +132,33 @@ export default function MovementPassForm({ onSubmit }) {
 
       {/* Dynamic Fields based on Type */}
       {form.movementType === 'PS slot' && (
-        <div>
-          <label className="label">Slot Timing *</label>
-          <select
-            id="mp-slot"
-            className={`input ${errors.slot ? 'border-danger' : ''}`}
-            value={form.slot}
-            onChange={set('slot')}
-          >
-            <option value="">Select slot…</option>
-            {PS_TIMINGS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          {errors.slot && <p className="text-xs text-danger mt-1">{errors.slot}</p>}
+        <div className="space-y-4">
+          <div>
+            <label className="label">Slot Timing *</label>
+            <select
+              id="mp-slot"
+              className={`input ${errors.slot ? 'border-danger' : ''}`}
+              value={form.slot}
+              onChange={set('slot')}
+            >
+              <option value="">Select slot…</option>
+              {PS_TIMINGS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            {errors.slot && <p className="text-xs text-danger mt-1">{errors.slot}</p>}
+          </div>
+
+          <div>
+            <label className="label">Skill Name *</label>
+            <input
+              id="mp-skill-name"
+              type="text"
+              placeholder="e.g. React, Node JS, Aptitude..."
+              className={`input ${errors.skillName ? 'border-danger' : ''}`}
+              value={form.skillName || ''}
+              onChange={set('skillName')}
+            />
+            {errors.skillName && <p className="text-xs text-danger mt-1">{errors.skillName}</p>}
+          </div>
         </div>
       )}
 

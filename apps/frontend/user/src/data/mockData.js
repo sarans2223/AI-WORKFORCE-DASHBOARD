@@ -229,6 +229,8 @@ export const mockLeaves = [
     id: 'lv-1',
     startDate: format(subDays(today, 20), 'yyyy-MM-dd'),
     endDate: format(subDays(today, 18), 'yyyy-MM-dd'),
+    fromTime: '09:00 AM',
+    toTime: '05:00 PM',
     reason: 'Family function — sister\'s wedding ceremony',
     submittedOn: format(subDays(today, 25), 'yyyy-MM-dd'),
   },
@@ -236,6 +238,8 @@ export const mockLeaves = [
     id: 'lv-2',
     startDate: format(subDays(today, 10), 'yyyy-MM-dd'),
     endDate: format(subDays(today, 10), 'yyyy-MM-dd'),
+    fromTime: '10:00 AM',
+    toTime: '01:00 PM',
     reason: 'Medical appointment — routine health checkup',
     submittedOn: format(subDays(today, 12), 'yyyy-MM-dd'),
   },
@@ -268,6 +272,16 @@ export const SLOTS = [
 
 export const mockMovementPasses = [
   {
+    id: 'mp-active-ps',
+    date: todayStr,
+    movementType: 'PS slot',
+    slot: 'P-Skill Slot B',
+    timing: '11:00 AM – 12:00 PM',
+    reason: 'Attending communication skills workshop',
+    skillName: 'React Development',
+    status: 'ACTIVE'
+  },
+  {
     id: 'mp-active',
     date: todayStr,
     movementType: 'Lab',
@@ -291,6 +305,7 @@ export const mockMovementPasses = [
     slot: 'P-Skill Slot A',
     timing: '10:00 AM – 11:00 AM',
     reason: 'Attending communication skills workshop',
+    skillName: 'Communication Skills',
   },
   {
     id: 'mp-3',

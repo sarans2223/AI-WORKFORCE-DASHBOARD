@@ -110,23 +110,36 @@ export default function Dashboard() {
   }
 
   const renderMyProjectCard = () => {
-    if (!project) return null
     return (
       <div>
-        <h2 className="text-base font-bold text-text-primary mb-3">My Project</h2>
-        <button
-          onClick={() => { setModalTab('details'); setShowProjectModal(true); }}
-          className="w-full card bg-primary-light border border-primary/20 hover:border-primary transition-all duration-200 text-left flex items-start justify-between gap-4"
-        >
-          <div>
-            <p className="text-xs font-semibold text-primary uppercase tracking-wide">Team: {project.teamId}</p>
-            <p className="text-lg font-bold text-text-primary mt-0.5">{project.title}</p>
-            <p className="text-sm text-text-secondary mt-1 line-clamp-1">{project.description}</p>
+        <h2 className="text-base font-bold text-text-primary mb-3">My Team</h2>
+        {project ? (
+          <button
+            onClick={() => { setModalTab('details'); setShowProjectModal(true); }}
+            className="w-full card bg-primary-light border border-primary/20 hover:border-primary transition-all duration-200 text-left flex items-start justify-between gap-4"
+          >
+            <div className="space-y-1 flex-1">
+              <p className="text-[10px] font-black text-primary uppercase tracking-wide">Team: {project.teamId}</p>
+              <p className="text-base font-bold text-text-primary mt-0.5 leading-snug">{project.title}</p>
+              <div className="pt-2 border-t border-primary/10 mt-2 space-y-1 text-xs">
+                <p className="text-text-primary font-medium">
+                  <span className="font-bold text-primary">Lead:</span> {project.lead}
+                </p>
+                <p className="text-text-secondary font-medium">
+                  <span className="font-bold text-text-primary">Members:</span> {project.members.join(', ')}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 bg-white rounded-xl flex-shrink-0 mt-1">
+              <ArrowRight className="w-4 h-4 text-primary" />
+            </div>
+          </button>
+        ) : (
+          <div className="w-full card bg-gray-50 border border-gray-150 p-4 text-center">
+            <p className="text-xs font-black text-text-muted uppercase tracking-wider">Project Title</p>
+            <p className="text-sm font-bold text-text-secondary mt-1">Not Assigned</p>
           </div>
-          <div className="p-2 bg-white rounded-xl flex-shrink-0">
-            <ArrowRight className="w-5 h-5 text-primary" />
-          </div>
-        </button>
+        )}
       </div>
     )
   }

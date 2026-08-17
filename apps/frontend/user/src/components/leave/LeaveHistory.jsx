@@ -44,9 +44,15 @@ export default function LeaveHistory({ leaves }) {
                   <h3 className="text-sm font-bold text-gray-900 group-hover:text-primary transition-colors">
                     {days} Day{days !== 1 ? 's' : ''} Leave
                   </h3>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5 font-medium">
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5 font-medium flex-wrap">
                     <Clock className="w-3 h-3" />
                     <span>Applied on {format(parseISO(lv.submittedOn), 'dd MMM yyyy')}</span>
+                    {lv.fromTime && lv.toTime && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-gray-300" />
+                        <span>Timing: {lv.fromTime} - {lv.toTime}</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold tracking-wide uppercase shadow-sm">

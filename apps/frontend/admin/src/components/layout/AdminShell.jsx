@@ -41,18 +41,18 @@ export default function AdminShell({ children, adminName }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 bg-sidebar shadow-sidebar z-40 flex flex-col transition-transform duration-300
+        className={`fixed top-0 left-0 h-screen w-64 bg-white border-r border-gray-100 z-40 flex flex-col transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:z-auto lg:flex-shrink-0`}
       >
         {/* Logo */}
-        <div className="px-6 py-6 border-b border-white/10">
+        <div className="px-6 py-6 border-b border-gray-50">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
               <span className="text-white font-black text-sm">AI</span>
             </div>
             <div>
-              <p className="text-white font-black text-sm leading-tight">AI Workforce</p>
-              <p className="text-white/50 text-xs">Admin Portal</p>
+              <p className="text-text-primary font-black text-sm leading-tight">AI Workforce</p>
+              <p className="text-text-muted text-xs">Admin Portal</p>
             </div>
           </div>
         </div>
@@ -73,19 +73,19 @@ export default function AdminShell({ children, adminName }) {
         </nav>
 
         {/* Admin info + Logout */}
-        <div className="px-4 py-5 border-t border-white/10">
+        <div className="px-4 py-5 border-t border-gray-50">
           <div className="flex items-center gap-3 mb-4 px-1">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-xs">{adminName?.charAt(0) || 'A'}</span>
+            <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
+              <span className="text-primary font-bold text-xs">{adminName?.charAt(0) || 'A'}</span>
             </div>
             <div className="min-w-0">
-              <p className="text-white text-xs font-semibold truncate">{adminName || 'Admin'}</p>
-              <p className="text-white/40 text-[10px]">Faculty Coordinator</p>
+              <p className="text-text-primary text-xs font-semibold truncate">{adminName || 'Admin'}</p>
+              <p className="text-text-muted text-[10px]">Faculty Coordinator</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="nav-item w-full text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-danger hover:bg-danger-soft font-semibold text-sm transition-all duration-150 cursor-pointer w-full"
           >
             <LogOut className="w-4 h-4" />
             <span>Log Out</span>

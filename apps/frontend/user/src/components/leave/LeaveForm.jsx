@@ -4,7 +4,13 @@ import { format } from 'date-fns'
 
 export default function LeaveForm({ onSubmit }) {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [form, setForm] = useState({ startDate: today, endDate: today, reason: '' })
+  const [form, setForm] = useState({ 
+    startDate: today, 
+    endDate: today, 
+    fromTime: '09:00', 
+    toTime: '17:00', 
+    reason: '' 
+  })
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
   const [success, setSuccess] = useState(false)
@@ -17,6 +23,16 @@ export default function LeaveForm({ onSubmit }) {
     if (!form.endDate) e.endDate = 'End date required'
     if (form.startDate && form.endDate && form.endDate < form.startDate)
       e.endDate = 'End date must be on or after start date'
+    
+    if (!form.fromTime) e.fromTime = 'From time required'
+    if (!form.toTime) e.toTime = 'To time required'
+    
+    if (form.startDate && form.endDate && form.startDate === form.endDate) {
+      if (form.fromTime && form.toTime && form.toTime <= form.fromTime) {
+        e.toTime = 'To time must be after from time'
+      }
+    }
+
     if (!form.reason.trim()) e.reason = 'Reason is required'
     return e
   }
@@ -29,7 +45,13 @@ export default function LeaveForm({ onSubmit }) {
     try {
       await onSubmit(form)
       setSuccess(true)
-      setForm({ startDate: today, endDate: today, reason: '' })
+      setForm({ 
+        startDate: today, 
+        endDate: today, 
+        fromTime: '09:00', 
+        toTime: '17:00', 
+        reason: '' 
+      })
       setTimeout(() => setSuccess(false), 3000)
     } finally {
       setSaving(false)
@@ -49,6 +71,7 @@ export default function LeaveForm({ onSubmit }) {
         </div>
       )}
 
+      {/* Dates row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Start Date *</label>
@@ -73,6 +96,32 @@ export default function LeaveForm({ onSubmit }) {
             onChange={set('endDate')}
           />
           {errors.endDate && <p className="text-xs text-danger mt-1">{errors.endDate}</p>}
+        </div>
+      </div>
+
+      {/* Times row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">From Time *</label>
+          <input
+            id="leave-from-time"
+            type="time"
+            className={`input ${errors.fromTime ? 'border-danger' : ''}`}
+            value={form.fromTime}
+            onChange={set('fromTime')}
+          />
+          {errors.fromTime && <p className="text-xs text-danger mt-1">{errors.fromTime}</p>}
+        </div>
+        <div>
+          <label className="label">To Time *</label>
+          <input
+            id="leave-to-time"
+            type="time"
+            className={`input ${errors.toTime ? 'border-danger' : ''}`}
+            value={form.toTime}
+            onChange={set('toTime')}
+          />
+          {errors.toTime && <p className="text-xs text-danger mt-1">{errors.toTime}</p>}
         </div>
       </div>
 
