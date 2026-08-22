@@ -20,13 +20,23 @@ export default function WeeklyCalendar() {
   const weekEnd = endOfWeek(baseDate, { weekStartsOn: 1 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
+  const [error, setError] = useState(null)
+
   useEffect(() => {
     const start = format(weekStart, 'yyyy-MM-dd')
     const end = format(weekEnd, 'yyyy-MM-dd')
-    activityService.getByDateRange(start, end).then(data => {
-      setActivities(data)
-      setLoading(false)
-    })
+    setLoading(true)
+    setError(null)
+    activityService.getByDateRange(start, end)
+      .then(data => {
+        setActivities(data)
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load weekly schedule')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [weekOffset])
 
   const getActivitiesForDay = (day) =>
@@ -48,6 +58,17 @@ export default function WeeklyCalendar() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card p-6 border border-red-200 text-center space-y-4 max-w-md mx-auto mt-10">
+        <p className="text-red-500 font-semibold">{error}</p>
+        <button onClick={() => setWeekOffset(prev => prev)} className="btn-primary text-xs px-4 py-2">
+          Try Again
+        </button>
       </div>
     )
   }

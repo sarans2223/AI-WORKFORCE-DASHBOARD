@@ -71,13 +71,15 @@ function WeeklyCalendarModal({ student, activity, onClose }) {
 
                 {/* Day Activities */}
                 <div className="flex-1 space-y-2">
-                  {dayGoal ? (
-                    <div className="p-4 rounded-2xl bg-white border border-gray-150 border-l-[4px] border-l-green-500 shadow-xs flex flex-col gap-1 w-full hover:border-gray-250 transition-all">
-                      <p className="text-xs sm:text-sm font-bold text-text-primary leading-snug break-words">{dayGoal.goal}</p>
-                      <p className="text-[10px] sm:text-xs font-semibold text-text-muted">
-                        09:30 – 11:00
-                      </p>
-                    </div>
+                  {dayGoal && dayGoal.activities && dayGoal.activities.length > 0 ? (
+                    dayGoal.activities.map((act, actIdx) => (
+                      <div key={actIdx} className="p-4 rounded-2xl bg-white border border-gray-150 border-l-[4px] border-l-green-500 shadow-xs flex flex-col gap-1 w-full hover:border-gray-250 transition-all">
+                        <p className="text-xs sm:text-sm font-bold text-text-primary leading-snug break-words">{act.goal}</p>
+                        <p className="text-[10px] sm:text-xs font-semibold text-text-muted">
+                          {act.time}
+                        </p>
+                      </div>
+                    ))
                   ) : (
                     <div className="border border-dashed border-primary/20 rounded-2xl flex items-center justify-center bg-white/20 p-4 w-full min-h-[60px]">
                       <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">EMPTY</span>
@@ -447,7 +449,7 @@ export default function Students() {
           // Standard CSV fallback
           const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
           for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(',').map(c => c.trim())
+            const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''))
             if (cols.length >= 3) {
               parsed.push({
                 name: cols[0],
@@ -498,11 +500,19 @@ export default function Students() {
     if (bulkStudents.length === 0) return
     setSubmitting(true)
     try {
-      await adminService.addStudentsBulk(bulkStudents)
-      setBulkFile(null)
-      setBulkStudents([])
-      setShowAddModal(false)
-      loadStudents()
+      const res = await adminService.addStudentsBulk(bulkStudents)
+      const summary = res.data || res
+      
+      if (summary.failed > 0) {
+        const errMsgs = summary.errors.map(e => `Row ${e.row}: ${e.message}`).join(' | ')
+        setBulkError(`Import completed with failures. Succeeded: ${summary.successful}, Failed: ${summary.failed}. Details: ${errMsgs}`)
+        loadStudents()
+      } else {
+        setBulkFile(null)
+        setBulkStudents([])
+        setShowAddModal(false)
+        loadStudents()
+      }
     } catch (err) {
       setBulkError('Failed to import student list.')
     } finally {
@@ -709,7 +719,7 @@ export default function Students() {
                       <input
                         type="file"
                         className="hidden"
-                        accept=".xlsx,.xls"
+                        accept=".xlsx,.xls,.csv"
                         onChange={handleFileChange}
                       />
                       <Upload className="w-8 h-8 text-text-muted group-hover:text-primary transition-colors mb-2" />

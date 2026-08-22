@@ -3,14 +3,16 @@ const studentRepository = require("./studentRepository");
 
 /**
  * Bulk Import Repository for transactional PostgreSQL batch operations
+ * Table: students
+ * Columns: id, register_number, name, email, phone, github_url, created_at, updated_at
  */
 
 const findExistingStudentIdentifiers = async (studentIds, rollNumbers, emails) => {
   const sql = `
-    SELECT student_id, roll_number, email
+    SELECT register_number AS student_id, register_number AS roll_number, email
     FROM students
-    WHERE student_id = ANY($1::text[])
-       OR roll_number = ANY($2::text[])
+    WHERE register_number = ANY($1::text[])
+       OR register_number = ANY($2::text[])
        OR LOWER(email) = ANY($3::text[]);
   `;
   const result = await query(sql, [studentIds, rollNumbers, emails.map((e) => e.toLowerCase())]);
@@ -18,25 +20,23 @@ const findExistingStudentIdentifiers = async (studentIds, rollNumbers, emails) =
 };
 
 /**
- * Inserts multiple valid student records using parameterized query within a transaction.
+ * Inserts multiple valid student records using parameterized query.
  */
 const bulkInsertStudents = async (studentRecords) => {
   if (!studentRecords || studentRecords.length === 0) return [];
 
-  // Build parameterized batch query
-  // VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()), ($7, $8, ...)
   const valueClauses = [];
   const queryParams = [];
 
   studentRecords.forEach((record, index) => {
-    const base = index * 6;
+    const base = index * 5;
     valueClauses.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, NOW(), NOW())`
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, NOW(), NOW())`
     );
+    const regNo = record.student_id || record.roll_number;
     queryParams.push(
-      record.student_id,
+      regNo,
       record.name,
-      record.roll_number,
       record.email,
       record.phone || null,
       record.github_url || null
@@ -44,9 +44,9 @@ const bulkInsertStudents = async (studentRecords) => {
   });
 
   const sql = `
-    INSERT INTO students (student_id, name, roll_number, email, phone, github_url, created_at, updated_at)
+    INSERT INTO students (register_number, name, email, phone, github_url, created_at, updated_at)
     VALUES ${valueClauses.join(", ")}
-    RETURNING id, student_id, name, roll_number, email, phone, github_url;
+    RETURNING id, register_number AS student_id, name, email, phone, github_url;
   `;
 
   const result = await query(sql, queryParams);

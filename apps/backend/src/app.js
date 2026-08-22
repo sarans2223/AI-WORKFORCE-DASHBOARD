@@ -9,6 +9,8 @@ const handlePSkillRoutes = require("./routes/pskillRoutes");
 const handleLeaveRoutes = require("./routes/leaveRoutes");
 const handleMovementRoutes = require("./routes/movementRoutes");
 const handleWeeklyRoutes = require("./routes/weeklyRoutes");
+const handleTeamRoutes = require("./routes/teamRoutes");
+const handleTaskRoutes = require("./routes/taskRoutes");
 
 /**
  * Main application HTTP request listener for Core Node.js.
@@ -40,6 +42,14 @@ const app = async (req, res) => {
     // 3. Weekly Analysis routes
     const isWeeklyRoute = await handleWeeklyRoutes(req, res, pathName, method, queryParams);
     if (isWeeklyRoute) return;
+
+    // Team/Project routes
+    const isTeamRoute = await handleTeamRoutes(req, res, pathName, method, queryParams);
+    if (isTeamRoute) return;
+
+    // Assigned Task routes
+    const isTaskRoute = await handleTaskRoutes(req, res, pathName, method, queryParams);
+    if (isTaskRoute) return;
 
     // 4. Movement Pass Management routes
     const isMovementRoute = await handleMovementRoutes(req, res, pathName, method, queryParams);

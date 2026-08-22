@@ -1,6 +1,8 @@
 const bulkImportRepository = require("../repositories/bulkImportRepository");
+const userRepository = require("../repositories/userRepository");
 const { validateStudentRow } = require("../validators/bulkImportValidator");
 const { parseCSV } = require("../utils/csvParser");
+const bcrypt = require("bcryptjs");
 
 /**
  * Service for Bulk Student Import Business Logic
@@ -123,6 +125,15 @@ const processBulkImport = async (rawInput, isCSV = false) => {
   let insertedRecords = [];
   if (validRecords.length > 0) {
     insertedRecords = await bulkImportRepository.bulkInsertStudents(validRecords);
+    for (const record of insertedRecords) {
+      const passwordHash = await bcrypt.hash(record.student_id, 10);
+      await userRepository.createUser({
+        email: record.email,
+        password: passwordHash,
+        role: "STUDENT",
+        studentId: record.id
+      });
+    }
   }
 
   return {

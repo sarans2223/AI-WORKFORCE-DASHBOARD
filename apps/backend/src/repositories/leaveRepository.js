@@ -1,42 +1,60 @@
 const { query } = require("../db/connection");
 
 /**
- * Repository for PostgreSQL leave_applications table queries.
+ * Repository for PostgreSQL leave_applications table.
  *
- * Assumed schema (migration file was empty):
- *   id, student_id, leave_type, reason, start_date, end_date,
- *   status, created_at, updated_at
+ * Table columns:
+ *   id
+ *   student_id
+ *   start_date
+ *   end_date
+ *   start_time
+ *   end_time
+ *   reason
+ *   created_at
  */
 
 const findLeaveById = async (id) => {
   const sql = `
-    SELECT id, student_id, leave_type, reason, start_date, end_date,
-           status, created_at, updated_at
+    SELECT
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason,
+      created_at
     FROM leave_applications
     WHERE id = $1
     LIMIT 1;
   `;
+
   const result = await query(sql, [id]);
   return result.rows[0] || null;
 };
 
+
 const findLeaveApplications = async (filters = {}) => {
   let sql = `
-    SELECT id, student_id, leave_type, reason, start_date, end_date,
-           status, created_at, updated_at
+    SELECT
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason,
+      created_at
     FROM leave_applications
   `;
+
   const conditions = [];
   const values = [];
 
   if (filters.student_id) {
     values.push(filters.student_id);
     conditions.push(`student_id = $${values.length}`);
-  }
-
-  if (filters.status) {
-    values.push(filters.status.toUpperCase());
-    conditions.push(`status = $${values.length}`);
   }
 
   if (filters.start_date) {
@@ -59,90 +77,159 @@ const findLeaveApplications = async (filters = {}) => {
   return result.rows;
 };
 
+
 /**
- * Check whether a student already has an overlapping leave application
- * that is not cancelled. Returns any conflicting record.
+ * Check whether a student already has an overlapping leave
+ * for the same date/time period.
  */
-const findOverlappingLeave = async (studentId, startDate, endDate) => {
+const findOverlappingLeave = async (
+  studentId,
+  startDate,
+  endDate,
+  startTime,
+  endTime
+) => {
   const sql = `
-    SELECT id, student_id, leave_type, reason, start_date, end_date, status
+    SELECT
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason
     FROM leave_applications
     WHERE student_id = $1
-      AND status != 'CANCELLED'
+
       AND start_date <= $3
-      AND end_date   >= $2
+      AND end_date >= $2
+
+      AND (
+        start_time IS NULL
+        OR end_time IS NULL
+        OR $4::time < end_time
+        AND $5::time > start_time
+      )
+
     LIMIT 1;
   `;
-  const result = await query(sql, [studentId, startDate, endDate]);
+
+  const result = await query(sql, [
+    studentId,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+  ]);
+
   return result.rows[0] || null;
 };
 
+
 const createLeaveApplication = async ({
   student_id,
-  leave_type,
-  reason,
   start_date,
   end_date,
-  status,
+  start_time,
+  end_time,
+  reason,
 }) => {
   const sql = `
     INSERT INTO leave_applications
-      (student_id, leave_type, reason, start_date, end_date, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id, student_id, leave_type, reason, start_date, end_date,
-              status, created_at, updated_at;
+      (
+        student_id,
+        start_date,
+        end_date,
+        start_time,
+        end_time,
+        reason,
+        created_at
+      )
+    VALUES
+      ($1, $2, $3, $4, $5, $6, NOW())
+
+    RETURNING
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason,
+      created_at;
   `;
-  const values = [student_id, leave_type, reason, start_date, end_date, status || "PENDING"];
+
+  const values = [
+    student_id,
+    start_date,
+    end_date,
+    start_time,
+    end_time,
+    reason,
+  ];
+
   const result = await query(sql, values);
   return result.rows[0];
 };
+
 
 const updateLeaveApplication = async (id, fields) => {
   const sql = `
     UPDATE leave_applications
-    SET reason     = COALESCE($1, reason),
-        start_date = COALESCE($2, start_date),
-        end_date   = COALESCE($3, end_date),
-        leave_type = COALESCE($4, leave_type),
-        updated_at = NOW()
-    WHERE id = $5
-    RETURNING id, student_id, leave_type, reason, start_date, end_date,
-              status, created_at, updated_at;
+    SET
+      reason = COALESCE($1, reason),
+      start_date = COALESCE($2, start_date),
+      end_date = COALESCE($3, end_date),
+      start_time = COALESCE($4, start_time),
+      end_time = COALESCE($5, end_time)
+
+    WHERE id = $6
+
+    RETURNING
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason,
+      created_at;
   `;
+
   const values = [
-    fields.reason    || null,
+    fields.reason || null,
     fields.start_date || null,
-    fields.end_date   || null,
-    fields.leave_type || null,
+    fields.end_date || null,
+    fields.start_time || null,
+    fields.end_time || null,
     id,
   ];
+
   const result = await query(sql, values);
   return result.rows[0];
 };
 
-const cancelLeaveApplication = async (id) => {
-  const sql = `
-    UPDATE leave_applications
-    SET status     = 'CANCELLED',
-        updated_at = NOW()
-    WHERE id = $1
-    RETURNING id, student_id, leave_type, reason, start_date, end_date,
-              status, created_at, updated_at;
-  `;
-  const result = await query(sql, [id]);
-  return result.rows[0];
-};
 
 const deleteLeaveApplication = async (id) => {
   const sql = `
     DELETE FROM leave_applications
     WHERE id = $1
-    RETURNING id, student_id, leave_type, reason, start_date, end_date,
-              status, created_at, updated_at;
+
+    RETURNING
+      id,
+      student_id,
+      start_date::text AS start_date,
+      end_date::text AS end_date,
+      start_time::text AS start_time,
+      end_time::text AS end_time,
+      reason,
+      created_at;
   `;
+
   const result = await query(sql, [id]);
   return result.rows[0];
 };
+
 
 module.exports = {
   findLeaveById,
@@ -150,6 +237,5 @@ module.exports = {
   findOverlappingLeave,
   createLeaveApplication,
   updateLeaveApplication,
-  cancelLeaveApplication,
   deleteLeaveApplication,
 };

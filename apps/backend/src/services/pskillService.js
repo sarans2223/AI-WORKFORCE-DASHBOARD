@@ -12,6 +12,10 @@ const { validateAssignPSkill, validateUpdateStudentPSkill } = require("../valida
 
 const getAllPSkills = async () => {
   const pskills = await pskillRepository.findAllPSkills();
+  for (const s of pskills) {
+    const levels = await pskillRepository.findPSkillLevels(s.id);
+    s.levels = levels.map(l => l.level_code);
+  }
   return pskills || [];
 };
 
@@ -110,13 +114,14 @@ const assignPSkill = async (assignmentData) => {
     }
   }
 
-  // 5. Check for duplicate assignment (same student + same P-Skill)
+  // 5. Check for duplicate assignment (same student + same P-Skill level)
   const existingAssignment = await pskillRepository.findStudentPSkillAssignment(
     validated.student_id,
-    validated.pskill_id
+    validated.pskill_id,
+    validated.level
   );
   if (existingAssignment) {
-    const error = new Error("Student is already assigned to this P-Skill");
+    const error = new Error("Student is already assigned to this P-Skill level");
     error.statusCode = 409;
     error.errorCode = "DUPLICATE_PSKILL_ASSIGNMENT";
     throw error;

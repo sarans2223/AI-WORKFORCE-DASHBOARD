@@ -2,13 +2,17 @@ const { query } = require("../db/connection");
 
 /**
  * Repository for PostgreSQL student table queries
+ * Table name: students
+ * Column schema:
+ *   id (bigint), register_number (varchar), name (varchar), email (varchar),
+ *   phone (varchar), github_url (text), created_at (timestamp), updated_at (timestamp)
  */
 
 const findStudentByStudentId = async (studentId) => {
   const sql = `
-    SELECT id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at
+    SELECT id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at
     FROM students
-    WHERE student_id = $1
+    WHERE register_number = $1 OR id::text = $1
     LIMIT 1;
   `;
   const result = await query(sql, [studentId]);
@@ -17,9 +21,9 @@ const findStudentByStudentId = async (studentId) => {
 
 const findStudentById = async (identifier) => {
   const sql = `
-    SELECT id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at
+    SELECT id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at
     FROM students
-    WHERE student_id = $1 OR id::text = $1
+    WHERE register_number = $1 OR id::text = $1
     LIMIT 1;
   `;
   const result = await query(sql, [identifier]);
@@ -28,9 +32,9 @@ const findStudentById = async (identifier) => {
 
 const findStudentByRollNumber = async (rollNumber) => {
   const sql = `
-    SELECT id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at
+    SELECT id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at
     FROM students
-    WHERE roll_number = $1
+    WHERE register_number = $1
     LIMIT 1;
   `;
   const result = await query(sql, [rollNumber]);
@@ -39,7 +43,7 @@ const findStudentByRollNumber = async (rollNumber) => {
 
 const findStudentByEmail = async (email) => {
   const sql = `
-    SELECT id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at
+    SELECT id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at
     FROM students
     WHERE LOWER(email) = LOWER($1)
     LIMIT 1;
@@ -50,7 +54,7 @@ const findStudentByEmail = async (email) => {
 
 const findAllStudents = async () => {
   const sql = `
-    SELECT id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at
+    SELECT id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at
     FROM students
     ORDER BY created_at DESC;
   `;
@@ -59,12 +63,13 @@ const findAllStudents = async () => {
 };
 
 const createStudent = async ({ student_id, name, roll_number, email, phone, github_url }) => {
+  const regNo = student_id || roll_number;
   const sql = `
-    INSERT INTO students (student_id, name, roll_number, email, phone, github_url, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at;
+    INSERT INTO students (register_number, name, email, phone, github_url, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+    RETURNING id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at;
   `;
-  const values = [student_id, name, roll_number, email, phone || null, github_url || null];
+  const values = [regNo, name, email, phone || null, github_url || null];
   const result = await query(sql, values);
   return result.rows[0];
 };
@@ -73,15 +78,15 @@ const updateStudent = async (identifier, { name, roll_number, email, phone, gith
   const sql = `
     UPDATE students
     SET name = COALESCE($1, name),
-        roll_number = COALESCE($2, roll_number),
-        email = COALESCE($3, email),
-        phone = COALESCE($4, phone),
-        github_url = COALESCE($5, github_url),
+        email = COALESCE($2, email),
+        phone = COALESCE($3, phone),
+        github_url = COALESCE($4, github_url),
+        register_number = COALESCE($5, register_number),
         updated_at = NOW()
-    WHERE student_id = $6 OR id::text = $6
-    RETURNING id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at;
+    WHERE register_number = $6 OR id::text = $6
+    RETURNING id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at;
   `;
-  const values = [name, roll_number, email, phone, github_url, identifier];
+  const values = [name, email, phone, github_url, roll_number || null, identifier];
   const result = await query(sql, values);
   return result.rows[0];
 };
@@ -89,8 +94,8 @@ const updateStudent = async (identifier, { name, roll_number, email, phone, gith
 const deleteStudent = async (identifier) => {
   const sql = `
     DELETE FROM students
-    WHERE student_id = $1 OR id::text = $1
-    RETURNING id, student_id, name, roll_number, email, phone, github_url, created_at, updated_at;
+    WHERE register_number = $1 OR id::text = $1
+    RETURNING id, register_number AS student_id, register_number, name, email, phone, github_url, created_at, updated_at;
   `;
   const result = await query(sql, [identifier]);
   return result.rows[0];

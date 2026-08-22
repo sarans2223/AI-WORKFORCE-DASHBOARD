@@ -1,9 +1,18 @@
 /**
- * Validator for Leave Management API requests
+ * Validator for Leave Monitoring API requests
+ *
+ * This application is MONITORING ONLY.
+ *
+ * Leave records contain:
+ *   student_id
+ *   start_date
+ *   end_date
+ *   start_time
+ *   end_time
+ *   reason
+ *
+ * No approve/reject/cancel status is used.
  */
-
-const ALLOWED_LEAVE_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"];
-const ALLOWED_LEAVE_TYPES = ["SICK", "PERSONAL", "ACADEMIC", "EMERGENCY", "OTHER"];
 
 const validateCreateLeave = (data) => {
   if (!data || typeof data !== "object") {
@@ -15,58 +24,163 @@ const validateCreateLeave = (data) => {
 
   const errors = [];
 
-  // 1. Student ID
-  if (!data.student_id || typeof data.student_id !== "string" || !data.student_id.trim()) {
+  // ============================================================
+  // STUDENT ID
+  // ============================================================
+
+  if (
+    data.student_id === undefined ||
+    data.student_id === null ||
+    String(data.student_id).trim() === ""
+  ) {
     errors.push("student_id is required");
+  } else if (!/^\d+$/.test(String(data.student_id).trim())) {
+    errors.push("student_id must be a valid number");
   }
 
-  // 2. Reason
-  if (!data.reason || typeof data.reason !== "string" || !data.reason.trim()) {
+  // ============================================================
+  // REASON
+  // ============================================================
+
+  if (
+    !data.reason ||
+    typeof data.reason !== "string" ||
+    !data.reason.trim()
+  ) {
     errors.push("reason is required");
   }
 
-  // 3. Start date — required
-  if (!data.start_date || typeof data.start_date !== "string" || !data.start_date.trim()) {
+  // ============================================================
+  // START DATE
+  // ============================================================
+
+  if (
+    !data.start_date ||
+    typeof data.start_date !== "string" ||
+    !data.start_date.trim()
+  ) {
     errors.push("start_date is required");
   } else {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
     if (!dateRegex.test(data.start_date.trim())) {
       errors.push("start_date must be in YYYY-MM-DD format");
     }
   }
 
-  // 4. End date — required
-  if (!data.end_date || typeof data.end_date !== "string" || !data.end_date.trim()) {
+  // ============================================================
+  // END DATE
+  // ============================================================
+
+  if (
+    !data.end_date ||
+    typeof data.end_date !== "string" ||
+    !data.end_date.trim()
+  ) {
     errors.push("end_date is required");
   } else {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
     if (!dateRegex.test(data.end_date.trim())) {
       errors.push("end_date must be in YYYY-MM-DD format");
     }
   }
 
-  // 5. start_date must not be after end_date
+  // ============================================================
+  // DATE RANGE
+  // ============================================================
+
   if (
     data.start_date &&
     data.end_date &&
-    /^\d{4}-\d{2}-\d{2}$/.test(data.start_date.trim()) &&
-    /^\d{4}-\d{2}-\d{2}$/.test(data.end_date.trim())
+    /^\d{4}-\d{2}-\d{2}$/.test(String(data.start_date).trim()) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(data.end_date).trim())
   ) {
-    if (new Date(data.start_date.trim()) > new Date(data.end_date.trim())) {
+    if (
+      new Date(data.start_date.trim()) >
+      new Date(data.end_date.trim())
+    ) {
       errors.push("start_date cannot be after end_date");
     }
   }
 
-  // 6. Leave type (optional, defaults to OTHER)
-  let leave_type = "OTHER";
-  if (data.leave_type) {
-    const upperType = String(data.leave_type).trim().toUpperCase();
-    if (!ALLOWED_LEAVE_TYPES.includes(upperType)) {
-      errors.push(`leave_type must be one of: ${ALLOWED_LEAVE_TYPES.join(", ")}`);
-    } else {
-      leave_type = upperType;
+  // ============================================================
+  // START TIME
+  // ============================================================
+
+  if (
+    !data.start_time ||
+    typeof data.start_time !== "string" ||
+    !data.start_time.trim()
+  ) {
+    errors.push("start_time is required");
+  } else {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
+
+    if (!timeRegex.test(data.start_time.trim())) {
+      errors.push("start_time must be in HH:MM or HH:MM:SS format");
     }
   }
+
+  // ============================================================
+  // END TIME
+  // ============================================================
+
+  if (
+    !data.end_time ||
+    typeof data.end_time !== "string" ||
+    !data.end_time.trim()
+  ) {
+    errors.push("end_time is required");
+  } else {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
+
+    if (!timeRegex.test(data.end_time.trim())) {
+      errors.push("end_time must be in HH:MM or HH:MM:SS format");
+    }
+  }
+
+  // ============================================================
+  // TIME RANGE
+  // ============================================================
+
+  if (
+    data.start_time &&
+    data.end_time &&
+    typeof data.start_time === "string" &&
+    typeof data.end_time === "string"
+  ) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
+
+    if (
+      timeRegex.test(data.start_time.trim()) &&
+      timeRegex.test(data.end_time.trim())
+    ) {
+      const startParts = data.start_time
+        .trim()
+        .split(":")
+        .map(Number);
+
+      const endParts = data.end_time
+        .trim()
+        .split(":")
+        .map(Number);
+
+      const startMinutes =
+        startParts[0] * 60 + startParts[1];
+
+      const endMinutes =
+        endParts[0] * 60 + endParts[1];
+
+      if (endMinutes <= startMinutes) {
+        errors.push("end_time must be after start_time");
+      }
+    }
+  }
+
+  // ============================================================
+  // RETURN VALIDATION ERRORS
+  // ============================================================
 
   if (errors.length > 0) {
     const error = new Error(errors.join(", "));
@@ -75,15 +189,31 @@ const validateCreateLeave = (data) => {
     throw error;
   }
 
+  // ============================================================
+  // RETURN CLEAN DATA
+  // ============================================================
+
   return {
-    student_id: data.student_id.trim(),
+    student_id: String(data.student_id).trim(),
+
     reason: data.reason.trim(),
+
     start_date: data.start_date.trim(),
+
     end_date: data.end_date.trim(),
-    leave_type,
-    status: "PENDING",
+
+    start_time: data.start_time.trim(),
+
+    end_time: data.end_time.trim(),
   };
 };
+
+
+// ================================================================
+// UPDATE VALIDATION
+// ================================================================
+// Monitoring application does not use update operations.
+// Kept only so existing imports do not break.
 
 const validateUpdateLeave = (data) => {
   if (!data || typeof data !== "object") {
@@ -97,7 +227,10 @@ const validateUpdateLeave = (data) => {
   const errors = [];
 
   if (data.reason !== undefined) {
-    if (typeof data.reason !== "string" || !data.reason.trim()) {
+    if (
+      typeof data.reason !== "string" ||
+      !data.reason.trim()
+    ) {
       errors.push("reason cannot be empty");
     } else {
       sanitized.reason = data.reason.trim();
@@ -107,43 +240,57 @@ const validateUpdateLeave = (data) => {
   if (data.start_date !== undefined) {
     if (typeof data.start_date !== "string") {
       errors.push("start_date must be a string");
+    } else if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(data.start_date.trim())
+    ) {
+      errors.push("start_date must be in YYYY-MM-DD format");
     } else {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(data.start_date.trim())) {
-        errors.push("start_date must be in YYYY-MM-DD format");
-      } else {
-        sanitized.start_date = data.start_date.trim();
-      }
+      sanitized.start_date = data.start_date.trim();
     }
   }
 
   if (data.end_date !== undefined) {
     if (typeof data.end_date !== "string") {
       errors.push("end_date must be a string");
+    } else if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(data.end_date.trim())
+    ) {
+      errors.push("end_date must be in YYYY-MM-DD format");
     } else {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(data.end_date.trim())) {
-        errors.push("end_date must be in YYYY-MM-DD format");
-      } else {
-        sanitized.end_date = data.end_date.trim();
-      }
+      sanitized.end_date = data.end_date.trim();
     }
   }
 
-  if (data.leave_type !== undefined) {
-    const upperType = String(data.leave_type).trim().toUpperCase();
-    if (!ALLOWED_LEAVE_TYPES.includes(upperType)) {
-      errors.push(`leave_type must be one of: ${ALLOWED_LEAVE_TYPES.join(", ")}`);
+  if (data.start_time !== undefined) {
+    if (typeof data.start_time !== "string") {
+      errors.push("start_time must be a string");
+    } else if (
+      !/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(
+        data.start_time.trim()
+      )
+    ) {
+      errors.push(
+        "start_time must be in HH:MM or HH:MM:SS format"
+      );
     } else {
-      sanitized.leave_type = upperType;
+      sanitized.start_time = data.start_time.trim();
     }
   }
 
-  // Validate date range if both are present in this update
-  const start = sanitized.start_date || null;
-  const end = sanitized.end_date || null;
-  if (start && end && new Date(start) > new Date(end)) {
-    errors.push("start_date cannot be after end_date");
+  if (data.end_time !== undefined) {
+    if (typeof data.end_time !== "string") {
+      errors.push("end_time must be a string");
+    } else if (
+      !/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(
+        data.end_time.trim()
+      )
+    ) {
+      errors.push(
+        "end_time must be in HH:MM or HH:MM:SS format"
+      );
+    } else {
+      sanitized.end_time = data.end_time.trim();
+    }
   }
 
   if (errors.length > 0) {
@@ -156,9 +303,8 @@ const validateUpdateLeave = (data) => {
   return sanitized;
 };
 
+
 module.exports = {
-  ALLOWED_LEAVE_STATUSES,
-  ALLOWED_LEAVE_TYPES,
   validateCreateLeave,
   validateUpdateLeave,
 };

@@ -77,48 +77,94 @@ export default function Attendance() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Parse time to minutes from midnight for mathematical overlap calculations
+  // Parse time to minutes from midnight for mathematical overlap calculations.
+  // Accepts "hh:mm AM/PM", "hh AM/PM", or bare 24h "HH:MM" / "HH:MM:SS" strings.
   const parseTimeToMinutes = (timeStr) => {
     if (!timeStr) return 0
-    const clean = timeStr.trim().toLowerCase()
-    const match = clean.match(/(\d+):(\d+)\s*(am|pm)/)
-    if (!match) {
-      const simpleMatch = clean.match(/(\d+)\s*(am|pm)/)
-      if (simpleMatch) {
-        let h = parseInt(simpleMatch[1])
-        const period = simpleMatch[2]
-        if (period === 'pm' && h < 12) h += 12
-        if (period === 'am' && h === 12) h = 0
-        return h * 60
-      }
-      return 0
+    const clean = timeStr.trim().toLowerCase().replace(/\./g, ':')
+
+    // 12-hour with minutes: "11:15 am", "01:30 pm"
+    const m12 = clean.match(/(\d+):(\d+)\s*(am|pm)/)
+    if (m12) {
+      let h = parseInt(m12[1]), m = parseInt(m12[2])
+      const ap = m12[3]
+      if (ap === 'pm' && h < 12) h += 12
+      if (ap === 'am' && h === 12) h = 0
+      return h * 60 + m
     }
-    let hr = parseInt(match[1])
-    const min = parseInt(match[2])
-    const ampm = match[3]
-    if (ampm === 'pm' && hr < 12) hr += 12
-    if (ampm === 'am' && hr === 12) hr = 0
-    return hr * 60 + min
+    // 12-hour without minutes: "11 am"
+    const m12s = clean.match(/(\d+)\s*(am|pm)/)
+    if (m12s) {
+      let h = parseInt(m12s[1])
+      const ap = m12s[2]
+      if (ap === 'pm' && h < 12) h += 12
+      if (ap === 'am' && h === 12) h = 0
+      return h * 60
+    }
+    // 24-hour with optional seconds: "13:30:00" or "13:30"
+    const m24 = clean.match(/^(\d{1,2}):(\d{2})/)
+    if (m24) {
+      return parseInt(m24[1]) * 60 + parseInt(m24[2])
+    }
+    return 0
   }
 
-  // Check if a movement pass overlaps with the hourly slot time range
-  const getOverlappingPass = (pass, slotStartStr, slotEndStr) => {
-    let timing = pass.timing || ''
-    timing = timing.replace(/–/g, '-').replace(/to/g, '-')
-    const parts = timing.split('-')
+  // Format minutes-from-midnight back to "hh:mm AM/PM"
+  const minutesToAmPm = (totalMin) => {
+    const h24 = Math.floor(totalMin / 60)
+    const m = totalMin % 60
+    const ap = h24 >= 12 ? 'PM' : 'AM'
+    let h12 = h24 % 12
+    if (h12 === 0) h12 = 12
+    return `${h12}:${String(m).padStart(2, '0')} ${ap}`
+  }
+
+  // Parse a pass's "timing" string ("hh:mm AM - hh:mm PM") into [startMin, endMin].
+  // Returns null if it cannot be parsed.
+  const parsePassTimingRange = (timingStr) => {
+    if (!timingStr) return null
+    const parts = timingStr.replace(/–/g, '-').replace(/\s+to\s+/gi, ' - ').split('-')
     if (parts.length < 2) return null
-    
-    const passStart = parseTimeToMinutes(parts[0])
-    const passEnd = parseTimeToMinutes(parts[1])
-    
+    const s = parseTimeToMinutes(parts[0])
+    const e = parseTimeToMinutes(parts[1])
+    if (s === 0 && e === 0) return null
+    return [s, e]
+  }
+
+  // Compute overlap info between a pass and a slot period.
+  // Returns: { overlaps, overlapStart, overlapEnd, overlapMinutes, isPartial, fullDuration }
+  // or null when there is no overlap at all.
+  const computeOverlap = (pass, slotStartStr, slotEndStr) => {
+    const passRange = parsePassTimingRange(pass.timing)
+    if (!passRange) return null
+    const [passStart, passEnd] = passRange
     const slotStart = parseTimeToMinutes(slotStartStr)
     const slotEnd = parseTimeToMinutes(slotEndStr)
-    
-    // Overlap condition
-    if (passStart < slotEnd && passEnd > slotStart) {
-      return pass
+
+    const overlapStart = Math.max(passStart, slotStart)
+    const overlapEnd = Math.min(passEnd, slotEnd)
+
+    if (overlapStart >= overlapEnd) return null  // no real overlap
+
+    const overlapMinutes = overlapEnd - overlapStart
+    const fullDuration = passEnd - passStart
+    const isPartial = overlapMinutes < fullDuration
+
+    return {
+      overlaps: true,
+      overlapStart: minutesToAmPm(overlapStart),
+      overlapEnd: minutesToAmPm(overlapEnd),
+      overlapMinutes,
+      fullDuration,
+      isPartial,
     }
-    return null
+  }
+
+  // Thin wrapper — returns { pass, overlap } or null (replaces old getOverlappingPass)
+  const getOverlappingPassWithInfo = (pass, slotStartStr, slotEndStr) => {
+    const overlap = computeOverlap(pass, slotStartStr, slotEndStr)
+    if (!overlap) return null
+    return { pass, overlap }
   }
 
   // Lookup attendance session statuses for a specific date
@@ -247,27 +293,19 @@ export default function Attendance() {
     )
   }
 
-  // Render Hourly slots log list for selectedDate (Redesigned as vertical timeline)
+  // Render period boxes for selected date
   const renderHourlySlots = () => {
     const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd')
     const { forenoon, afternoon } = getDateStatus(selectedDate)
-    
-    // Fetch movement passes that match this date
     const datePasses = passes.filter(p => p.date === formattedSelectedDate)
 
-    // Calculate slots after applying active tab filters
     const filteredSlots = HOURLY_SLOTS.filter(slot => {
       let hasPass = false
       for (let pass of datePasses) {
-        if (getOverlappingPass(pass, slot.startTime, slot.endTime)) {
-          hasPass = true
-          break
-        }
+        if (getOverlappingPassWithInfo(pass, slot.startTime, slot.endTime)) { hasPass = true; break }
       }
-
-      const isSessionAbsent = slot.session === 'Forenoon' ? forenoon === 'ABSENT' : afternoon === 'ABSENT'
-      const isAbsent = isSessionAbsent && !hasPass
-
+      const isSessionPresent = slot.session === 'Forenoon' ? forenoon === 'PRESENT' : afternoon === 'PRESENT'
+      const isAbsent = !isSessionPresent && !hasPass
       if (filter === 'PRESENT') return !isAbsent
       if (filter === 'ABSENT') return isAbsent
       if (filter === 'PASS') return hasPass
@@ -275,106 +313,157 @@ export default function Attendance() {
     })
 
     return (
-      <div className="card border border-gray-100 bg-white p-5 relative overflow-hidden">
-        {/* Timeline Line */}
-        <div className="relative pl-6 border-l border-gray-100 space-y-6">
-          {filteredSlots.length === 0 ? (
-            <div className="text-center text-xs font-bold text-text-muted italic py-6 pl-2">
-              No hourly records found matching "{filter.toLowerCase()}" filter
-            </div>
-          ) : (
-            filteredSlots.map((slot) => {
-              // Check if there is an overlapping movement pass
-              let matchedPass = null
-              for (let pass of datePasses) {
-                const overlap = getOverlappingPass(pass, slot.startTime, slot.endTime)
-                if (overlap) {
-                  matchedPass = overlap
-                  break
-                }
+      <div className="space-y-2">
+        {filteredSlots.length === 0 ? (
+          <div className="text-center text-xs font-bold text-text-muted italic py-10">
+            No records matching "{filter.toLowerCase()}" filter
+          </div>
+        ) : (
+          filteredSlots.map((slot, idx) => {
+            // ── Find overlapping pass ────────────────────────────────────
+            let matchedPassInfo = null
+            for (let pass of datePasses) {
+              const info = getOverlappingPassWithInfo(pass, slot.startTime, slot.endTime)
+              if (info) { matchedPassInfo = info; break }
+            }
+            const matchedPass = matchedPassInfo?.pass ?? null
+            const overlapInfo = matchedPassInfo?.overlap ?? null
+
+            const isSessionPresent = slot.session === 'Forenoon' ? forenoon === 'PRESENT' : afternoon === 'PRESENT'
+            const isAbsent = !isSessionPresent && !matchedPass
+            const hasPass = !!matchedPass
+
+            // ── Proportional Pass Zone Position & Width (0–100%) ─────────
+            // leftOffsetPct  = where the pass begins in the slot timeline
+            // rightOffsetPct = how far from the end of the slot it finishes
+            // passWidthPct   = exact percentage of the period covered by the pass
+            let leftOffsetPct  = 0
+            let rightOffsetPct = 0
+            let passWidthPct   = 0
+
+
+            if (matchedPass && overlapInfo) {
+              const slotStartMin    = parseTimeToMinutes(slot.startTime)
+              const slotEndMin      = parseTimeToMinutes(slot.endTime)
+              const slotDurationMin = slotEndMin - slotStartMin
+              const passRange       = parsePassTimingRange(matchedPass.timing)
+              if (passRange && slotDurationMin > 0) {
+                const [passStartMin, passEndMin] = passRange
+                const clampedStart = Math.max(slotStartMin, passStartMin)
+                const clampedEnd   = Math.min(slotEndMin, passEndMin)
+                leftOffsetPct  = Math.max(0, Math.min(100, ((clampedStart - slotStartMin) / slotDurationMin) * 100))
+                rightOffsetPct = Math.max(0, Math.min(100, ((slotEndMin - clampedEnd) / slotDurationMin) * 100))
+                passWidthPct   = Math.max(0, Math.min(100, 100 - leftOffsetPct - rightOffsetPct))
               }
+            }
 
-              // Check absence in this slot session (FN or AN), taking movement pass into account
-              const isAbsent = (slot.session === 'Forenoon' ? forenoon === 'ABSENT' : afternoon === 'ABSENT') && !matchedPass
+            // ── Colors ──────────────────────────────────────────────────
+            const boxBg      = isAbsent ? 'rgba(254,202,202,0.50)' : 'rgba(220,252,231,0.50)'
+            const boxBorder  = isAbsent ? 'rgba(252,165,165,0.75)' : 'rgba(134,239,172,0.75)'
+            const statusColor   = isAbsent ? '#dc2626' : '#16a34a'
+            const statusBadgeBg = isAbsent ? 'rgba(254,202,202,0.95)' : 'rgba(187,247,208,0.95)'
+            const statusLabel   = isAbsent ? 'Absent' : hasPass ? 'Pass' : 'Present'
+            const slotNum       = `S${idx + 1}`
 
-              // Color configuration for nodes
-              const nodeColorClass = matchedPass 
-                ? 'bg-warning border-warning-soft' 
-                : isAbsent 
-                  ? 'bg-danger border-danger-soft' 
-                  : 'bg-success border-success-soft'
-
-              const timingColor = isAbsent ? 'text-danger' : matchedPass ? 'text-warning-dark' : 'text-text-primary'
-
-              return (
-                <div key={slot.id} className="relative flex flex-col gap-2 pl-2">
-                  {/* Timeline Bullet Node */}
-                  {isAbsent ? (
-                    <div className="absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full border-[3px] border-danger bg-white shadow-xs z-10" />
-                  ) : matchedPass ? (
-                    <div className="absolute -left-[29px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-warning shadow-xs" />
-                  ) : (
-                    <div className="absolute -left-[29px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-success shadow-xs" />
-                  )}
-
-                  {/* Main Header Row: Timing, Session, Status Badge */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-black tracking-tight ${timingColor}`}>
-                        {slot.startTime} - {slot.endTime}
-                      </span>
-                      <span className="text-[8px] font-black text-text-muted bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded uppercase leading-none">
-                        {slot.session === 'Forenoon' ? 'FN' : 'AN'}
-                      </span>
-                    </div>
-
-                    {/* Status Badges */}
-                    <div className="flex items-center gap-1.5">
-                      {matchedPass ? (
-                        <span className="px-1.5 py-0.5 bg-warning text-white text-[8px] font-black rounded uppercase tracking-wider">
-                          {matchedPass.skillName ? `P-Skill: ${matchedPass.skillName}` : 'Pass'}
-                        </span>
-                      ) : (
-                        <span className={`px-1.5 py-0.5 text-[8px] font-black rounded uppercase tracking-wider ${
-                          isAbsent ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'
-                        }`}>
-                          {isAbsent ? 'Absent' : 'Present'}
-                        </span>
-                      )}
-                    </div>
+            return (
+              <div
+                key={slot.id}
+                className="relative flex items-stretch rounded-2xl overflow-hidden transition-all shadow-xs"
+                style={{
+                  background: boxBg,
+                  border: `1.5px solid ${boxBorder}`,
+                  minHeight: '66px',
+                }}
+              >
+                {/* ════════════════════════════════════════════════════════
+                    LEFT: Slot & Session Info Panel (Dedicated, non-overlapping)
+                ════════════════════════════════════════════════════════ */}
+                <div className="w-44 sm:w-48 flex-shrink-0 flex items-center gap-3 px-3.5 py-3 bg-white/80 backdrop-blur-xs border-r border-black/5 z-20">
+                  {/* Slot pill */}
+                  <div
+                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-[10px] font-black shadow-2xs"
+                    style={{ background: 'rgba(255,255,255,0.95)', color: statusColor, border: `1px solid ${boxBorder}` }}
+                  >
+                    {slotNum}
                   </div>
 
-                  {/* Nested Pass details if applied */}
-                  {matchedPass && (
-                    <div className="ml-1 p-2.5 bg-warning-soft/30 border border-warning/15 rounded-xl space-y-1 flex flex-col">
-                      <div className="flex items-center gap-1 text-[8px] text-warning font-black uppercase tracking-wider">
-                        <MapPin className="w-2.5 h-2.5" /> Pass Details ({matchedPass.movementType})
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5 text-[9px] text-text-secondary leading-normal">
-                        <p>
-                          <span className="font-bold text-text-primary block">Pass Timing:</span> {matchedPass.timing}
-                        </p>
-                        {matchedPass.skillName && (
-                          <p>
-                            <span className="font-bold text-text-primary block">Skill Name:</span> {matchedPass.skillName}
+                  {/* Text block */}
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-text-primary leading-tight">
+                      {slot.startTime} – {slot.endTime}
+                    </p>
+                    <p className="text-[9px] text-text-muted font-bold mt-0.5 leading-none uppercase tracking-wider">
+                      {slot.session}
+                    </p>
+                  </div>
+                </div>
+
+                {/* ════════════════════════════════════════════════════════
+                    RIGHT: Timeline & Status Area (Full Height)
+                ════════════════════════════════════════════════════════ */}
+                <div className="flex-1 relative flex items-stretch min-w-0 overflow-hidden">
+                  {/* PROPORTIONAL COLORED PASS BLOCK (Full row height) */}
+                  {hasPass && overlapInfo && passWidthPct > 0 ? (
+                    <div
+                      className="absolute top-0 bottom-0 z-10 flex items-center justify-between px-3.5 overflow-hidden animate-fade-in transition-all"
+                      title={`${matchedPass.movementType || 'Movement Pass'} (${overlapInfo.overlapStart} – ${overlapInfo.overlapEnd}, ${overlapInfo.overlapMinutes} mins)${matchedPass.reason ? ` - ${matchedPass.reason}` : ''}`}
+                      style={{
+                        left: `${leftOffsetPct}%`,
+                        width: `${Math.min(100 - leftOffsetPct, Math.max(20, passWidthPct))}%`,
+                        background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.95) 100%)',
+                        borderLeft: leftOffsetPct > 0.5 ? '1.5px dashed rgba(217, 119, 6, 0.60)' : 'none',
+                        borderRight: rightOffsetPct > 0.5 ? '1.5px dashed rgba(217, 119, 6, 0.60)' : 'none',
+                      }}
+                    >
+                      {/* Pass Details */}
+                      <div className="min-w-0 pr-2 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <MapPin className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+                          <span className="text-[11px] font-black text-amber-950 truncate">
+                            {matchedPass.movementType || 'Pass'}
+                          </span>
+                          <span className="text-[9px] font-bold text-amber-800 font-mono whitespace-nowrap">
+                            ({overlapInfo.overlapStart} – {overlapInfo.overlapEnd})
+                          </span>
+                        </div>
+                        {matchedPass.reason && (
+                          <p className="text-[9px] font-semibold text-amber-900/90 truncate mt-0.5 leading-tight">
+                            {matchedPass.reason}
                           </p>
                         )}
                       </div>
-                      {matchedPass.movementType !== 'PS slot' && (
-                        <p className="text-[9px] text-text-secondary leading-normal pt-1 border-t border-warning/10">
-                          <span className="font-bold text-text-primary">Reason:</span> {matchedPass.reason}
-                        </p>
-                      )}
+
+                      {/* Pass Badge */}
+                      <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-300/90 text-amber-950 uppercase tracking-wider border border-amber-400/60 shadow-2xs flex-shrink-0">
+                        PASS
+                      </span>
+                    </div>
+                  ) : (
+                    /* PRESENT / ABSENT BADGE (when no pass present) */
+                    <div className="flex-1 flex items-center justify-end pr-4 z-10">
+                      <span
+                        className="text-[9px] font-black rounded-full px-3 py-1 uppercase tracking-wider shadow-2xs flex-shrink-0"
+                        style={{ background: statusBadgeBg, color: statusColor }}
+                      >
+                        {statusLabel}
+                      </span>
                     </div>
                   )}
                 </div>
-              )
-            })
-          )}
-        </div>
+              </div>
+            )
+          })
+        )}
       </div>
     )
   }
+
+
+
+
+
+
+
 
   if (loading) {
     return (
@@ -389,7 +478,7 @@ export default function Attendance() {
       {/* Title */}
       <div>
         <h1 className="text-xl font-black text-text-primary tracking-tight">My Attendance</h1>
-        <p className="text-xs text-text-secondary mt-0.5">View hourly logs and approved pass verifications</p>
+        <p className="text-xs text-text-secondary mt-0.5">View hourly logs and pass activity records</p>
       </div>
 
       {/* Control Bar: Search, Month Filter, Date Selector & Log Filter Options */}

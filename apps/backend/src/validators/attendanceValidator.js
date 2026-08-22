@@ -43,6 +43,16 @@ const validateCreateAttendance = (data) => {
     }
   }
 
+  let session = "FORENOON";
+  if (data.session && typeof data.session === "string" && data.session.trim()) {
+    const upperSession = data.session.trim().toUpperCase();
+    if (["FORENOON", "AFTERNOON"].includes(upperSession)) {
+      session = upperSession;
+    } else {
+      errors.push("session must be FORENOON or AFTERNOON");
+    }
+  }
+
   if (errors.length > 0) {
     const error = new Error(errors.join(", "));
     error.statusCode = 400;
@@ -54,6 +64,7 @@ const validateCreateAttendance = (data) => {
     student_id: data.student_id.trim(),
     status,
     date,
+    session,
     remarks: data.remarks && typeof data.remarks === "string" ? data.remarks.trim() : "",
     check_in_time: data.check_in_time && typeof data.check_in_time === "string" ? data.check_in_time.trim() : null,
     check_out_time: data.check_out_time && typeof data.check_out_time === "string" ? data.check_out_time.trim() : null,
@@ -107,6 +118,19 @@ const validateUpdateAttendance = (data) => {
 
   if (data.check_out_time !== undefined) {
     sanitized.check_out_time = typeof data.check_out_time === "string" ? data.check_out_time.trim() : null;
+  }
+
+  if (data.session !== undefined) {
+    if (typeof data.session !== "string" || !data.session.trim()) {
+      errors.push("session cannot be empty");
+    } else {
+      const upperSession = data.session.trim().toUpperCase();
+      if (["FORENOON", "AFTERNOON"].includes(upperSession)) {
+        sanitized.session = upperSession;
+      } else {
+        errors.push("session must be FORENOON or AFTERNOON");
+      }
+    }
   }
 
   if (errors.length > 0) {

@@ -3,7 +3,14 @@
  */
 
 const setCORSHeaders = (res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const req = res.req;
+  const origin = req && req.headers ? req.headers.origin : null;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET, POST, PUT, DELETE, PATCH, OPTIONS"

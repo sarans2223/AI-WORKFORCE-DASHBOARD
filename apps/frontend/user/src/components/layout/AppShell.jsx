@@ -9,11 +9,11 @@ import { useApp } from '../../contexts/AppContext'
 
 export default function AppShell() {
   const { user, logout } = useAuth()
-  const { unreadCount, sidebarOpen, setSidebarOpen } = useApp()
+  const { unreadCount, sidebarOpen, setSidebarOpen, toasts } = useApp()
   const [showNotifs, setShowNotifs] = useState(false)
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden relative">
       {/* Sidebar */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -87,6 +87,24 @@ export default function AppShell() {
 
       {/* Mobile bottom nav */}
       <BottomNav />
+
+      {/* Floating Toast Popups Container */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
+        {toasts.map(toast => (
+          <div 
+            key={toast.id} 
+            className="bg-white border-2 border-primary/20 rounded-2xl shadow-modal p-4 flex items-start gap-3 pointer-events-auto animate-scale-in"
+          >
+            <div className="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center flex-shrink-0">
+              <Bell className="w-4.5 h-4.5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-text-primary">{toast.title}</p>
+              <p className="text-[10px] font-semibold text-text-secondary mt-0.5 leading-normal">{toast.message}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

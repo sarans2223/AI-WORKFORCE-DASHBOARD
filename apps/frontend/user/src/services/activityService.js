@@ -1,80 +1,139 @@
-// activityService.js
-// All functions currently operate on in-memory mock state.
-// To connect to a real API, replace each function body with an api.* call.
-
-import { mockActivities } from '../data/mockData'
+import { api, getStudentDbId } from './api'
 import { format } from 'date-fns'
 
-let activities = [...mockActivities]
+const normalize = (activity) => {
+  if (!activity) return null
+  
+  const d = new Date(activity.start_time)
+  const pad = (num) => String(num).padStart(2, '0')
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const startTime = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  
+  const dEnd = new Date(activity.end_time)
+  const endTime = `${pad(dEnd.getHours())}:${pad(dEnd.getMinutes())}`
+  
+  let extendedEndTime = null
+  if (activity.extended_until) {
+    const dExt = new Date(activity.extended_until)
+    extendedEndTime = `${pad(dExt.getHours())}:${pad(dExt.getMinutes())}`
+  }
 
-const delay = (ms = 300) => new Promise(r => setTimeout(r, ms))
+  let desc = activity.description || ''
+  let extensionReason = null
+  if (desc.startsWith('Extension Note: ')) {
+    extensionReason = desc.substring('Extension Note: '.length)
+  }
 
-const computeStatus = (activity) => {
-  const now = new Date()
-  const dateStr = format(now, 'yyyy-MM-dd')
-  const currentTime = format(now, 'HH:mm')
-
-  if (activity.date < dateStr) return 'COMPLETED'
-  if (activity.date > dateStr) return 'PLANNED'
-
-  const end = activity.extendedEndTime || activity.endTime
-  if (currentTime >= end) return 'COMPLETED'
-  if (currentTime >= activity.startTime) return 'IN_PROGRESS'
-  return 'PLANNED'
+  return {
+    id: String(activity.id),
+    name: activity.activity_name,
+    description: desc,
+    date,
+    startTime,
+    endTime,
+    progress: activity.progress || 0,
+    status: activity.status || 'PLANNED',
+    extendedEndTime,
+    extensionReason
+  }
 }
 
 export const activityService = {
   getAll: async () => {
-    await delay()
-    return activities.map(a => ({ ...a, status: computeStatus(a) }))
+    const response = await api.get('/activities')
+    const list = Array.isArray(response.data) ? response.data : (response || [])
+    return list.map(normalize)
   },
 
   getByDate: async (dateStr) => {
-    await delay()
-    return activities
-      .filter(a => a.date === dateStr)
-      .map(a => ({ ...a, status: computeStatus(a) }))
+    const studentId = await getStudentDbId()
+    const response = await api.get(`/activities?date=${dateStr}&student_id=${studentId}`)
+    const list = Array.isArray(response.data) ? response.data : (response || [])
+    return list.map(normalize)
   },
 
   getByDateRange: async (startDate, endDate) => {
-    await delay()
-    return activities
-      .filter(a => a.date >= startDate && a.date <= endDate)
-      .map(a => ({ ...a, status: computeStatus(a) }))
+    const studentId = await getStudentDbId()
+    const response = await api.get(`/activities?start_date=${startDate}&end_date=${endDate}&student_id=${studentId}`)
+    const list = Array.isArray(response.data) ? response.data : (response || [])
+    return list.map(normalize)
   },
 
   create: async (data) => {
-    await delay()
-    const newActivity = {
-      id: `act-${Date.now()}`,
-      extendedEndTime: null,
-      extensionReason: null,
-      ...data,
+    const [year, month, day] = data.date.split('-').map(Number)
+    const [startH, startM] = data.startTime.split(':').map(Number)
+    const [endH, endM] = data.endTime.split(':').map(Number)
+    
+    const start_time = new Date(year, month - 1, day, startH, startM, 0).toISOString()
+    const end_time = new Date(year, month - 1, day, endH, endM, 0).toISOString()
+    
+    const student_id = await getStudentDbId()
+    
+    const payload = {
+      student_id,
+      activity_name: data.name,
+      description: data.description || '',
+      start_time,
+      end_time,
+      status: data.status || 'PLANNED',
+      progress: data.progress || 0
     }
-    activities = [newActivity, ...activities]
-    return { ...newActivity, status: computeStatus(newActivity) }
+    
+    const response = await api.post('/activities', payload)
+    return normalize(response.data)
   },
 
   update: async (id, updates) => {
-    await delay()
-    activities = activities.map(a => a.id === id ? { ...a, ...updates } : a)
-    const updated = activities.find(a => a.id === id)
-    return { ...updated, status: computeStatus(updated) }
+    const payload = {}
+    if (updates.name !== undefined) payload.activity_name = updates.name
+    if (updates.description !== undefined) payload.description = updates.description
+    if (updates.progress !== undefined) payload.progress = updates.progress
+    if (updates.status !== undefined) payload.status = updates.status
+    
+    if (updates.date && updates.startTime) {
+      const [year, month, day] = updates.date.split('-').map(Number)
+      const [startH, startM] = updates.startTime.split(':').map(Number)
+      payload.start_time = new Date(year, month - 1, day, startH, startM, 0).toISOString()
+    }
+    if (updates.date && updates.endTime) {
+      const [year, month, day] = updates.date.split('-').map(Number)
+      const [endH, endM] = updates.endTime.split(':').map(Number)
+      payload.end_time = new Date(year, month - 1, day, endH, endM, 0).toISOString()
+    }
+
+    const response = await api.put(`/activities/${id}`, payload)
+    return normalize(response.data)
   },
 
   extendTime: async (id, extendedEndTime, reason) => {
-    await delay()
-    activities = activities.map(a =>
-      a.id === id
-        ? { ...a, extendedEndTime, extensionReason: reason }
-        : a
-    )
-    const updated = activities.find(a => a.id === id)
-    return { ...updated, status: computeStatus(updated) }
+    const response = await api.get(`/activities/${id}`)
+    const activity = response.data
+    
+    const origEndTime = new Date(activity.end_time)
+    const [hours, minutes] = extendedEndTime.split(':').map(Number)
+    const newEndTime = new Date(origEndTime)
+    newEndTime.setHours(hours, minutes, 0, 0)
+    
+    const diffMs = newEndTime - origEndTime
+    const extension_duration = Math.max(1, Math.round(diffMs / 60000))
+    
+    await api.put(`/activities/${id}/extend`, {
+      extension_duration,
+      new_end_time: newEndTime.toISOString()
+    })
+    
+    const updatePayload = {}
+    if (reason) {
+      updatePayload.description = `Extension Note: ${reason}`
+    } else {
+      updatePayload.description = activity.description || ''
+    }
+    
+    const updatedResponse = await api.put(`/activities/${id}`, updatePayload)
+    return normalize(updatedResponse.data)
   },
 
   delete: async (id) => {
-    await delay()
-    activities = activities.filter(a => a.id !== id)
-  },
+    await api.delete(`/activities/${id}`)
+  }
 }

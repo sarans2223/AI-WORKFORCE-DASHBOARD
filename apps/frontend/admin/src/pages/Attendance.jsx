@@ -1,13 +1,177 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Save, Loader2, CheckCircle2, ClipboardList, AlertTriangle, CalendarDays, History, X, Search, ChevronRight, Sun, Sunset
+  Save, Loader2, CheckCircle2, ClipboardList, AlertTriangle, CalendarDays, History, X, Search, ChevronRight, Sun, Sunset,
+  FileSpreadsheet, Download
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { adminService } from '../services/adminService'
+import { exportAttendanceExcel } from '../utils/excelExport'
 
 function getAutoSession() {
   const hour = new Date().getHours()
   return hour < 12 ? 'forenoon' : 'afternoon'
+}
+
+// ─── Quick Attendance Excel Export Modal ──────────────────────────────────────
+function ExportModal({ onClose, students, todayAttendance }) {
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [isExporting, setIsExporting] = useState(false)
+  const [previewData, setPreviewData] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    setLoadingPreview(true)
+    adminService.getAttendanceByDate(selectedDate).then(data => {
+      if (isMounted) {
+        setPreviewData(data)
+        setLoadingPreview(false)
+      }
+    }).catch(() => {
+      if (isMounted) setLoadingPreview(false)
+    })
+    return () => { isMounted = false }
+  }, [selectedDate])
+
+  const handleDownload = async () => {
+    setIsExporting(true)
+    try {
+      let attData = previewData
+      if (!attData) {
+        attData = await adminService.getAttendanceByDate(selectedDate)
+      }
+
+      exportAttendanceExcel({
+        date: selectedDate,
+        students,
+        attendance: attData || { forenoon: { records: [] }, afternoon: { records: [] } }
+      })
+      onClose()
+    } catch (e) {
+      console.error('Export failed', e)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const yesterdayDate = new Date()
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterdayStr = format(yesterdayDate, 'yyyy-MM-dd')
+
+  const parsedDate = typeof selectedDate === 'string' && selectedDate.includes('-') ? parseISO(selectedDate) : new Date(selectedDate)
+  const formattedPreviewDate = isNaN(parsedDate.getTime()) ? selectedDate : format(parsedDate, 'dd MMM yyyy (EEEE)')
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="bg-card rounded-card shadow-modal w-full max-w-md p-6 space-y-4 animate-scale-in" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-green-100 text-green-700 flex items-center justify-center">
+              <FileSpreadsheet className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-text-primary">Download Attendance Excel</h2>
+              <p className="text-[10px] text-text-muted">Export complete daily attendance spreadsheet</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Quick Date Selectors */}
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
+              Select Attendance Date
+            </label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDate(todayStr)}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-xl border transition-all ${
+                  selectedDate === todayStr ? 'bg-primary text-white border-primary shadow-xs' : 'bg-gray-50 text-text-secondary border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(yesterdayStr)}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-xl border transition-all ${
+                  selectedDate === yesterdayStr ? 'bg-primary text-white border-primary shadow-xs' : 'bg-gray-50 text-text-secondary border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                Yesterday
+              </button>
+            </div>
+            <input
+              type="date"
+              className="input text-xs py-2 w-full"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+            />
+          </div>
+
+          {/* Preview Box */}
+          <div className="bg-primary-light/15 border border-primary/20 rounded-xl p-3 space-y-1.5 text-xs">
+            <div className="flex justify-between items-center text-[10px] font-bold text-text-muted uppercase tracking-wider">
+              <span>Date Summary</span>
+              <span>{formattedPreviewDate}</span>
+            </div>
+            {loadingPreview ? (
+              <div className="flex items-center justify-center py-2 text-primary">
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                <div className="bg-white/80 p-2 rounded-lg border border-primary/10">
+                  <span className="text-[9px] text-text-muted block font-bold">Forenoon</span>
+                  <span className="font-bold text-text-primary">
+                    {previewData?.forenoon?.records?.filter(r => r.status === 'PRESENT').length || 0} Present / {students.length} Total
+                  </span>
+                </div>
+                <div className="bg-white/80 p-2 rounded-lg border border-primary/10">
+                  <span className="text-[9px] text-text-muted block font-bold">Afternoon</span>
+                  <span className="font-bold text-text-primary">
+                    {previewData?.afternoon?.records?.filter(r => r.status === 'PRESENT').length || 0} Present / {students.length} Total
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 btn-secondary text-xs py-2.5 cursor-pointer"
+            disabled={isExporting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isExporting}
+            className="flex-1 btn-primary text-xs py-2.5 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 border-green-600 text-white cursor-pointer"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" /> Download (.xlsx)
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── Attendance History Modal ──────────────────────────────────────────────────
@@ -17,6 +181,7 @@ function HistoryModal({ onClose, students }) {
   const [searchDate, setSearchDate] = useState('')
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [selectedSession, setSelectedSession] = useState('forenoon')
+  const [exportingDate, setExportingDate] = useState(null)
 
   useEffect(() => {
     adminService.getAttendanceHistory().then(data => {
@@ -34,6 +199,25 @@ function HistoryModal({ onClose, students }) {
 
   const getStudent = (id) => students.find(s => s.id === id)
 
+  const handleExportDate = async (dateStr, record) => {
+    setExportingDate(dateStr)
+    try {
+      let attData = record
+      if (!attData || !attData.forenoon) {
+        attData = await adminService.getAttendanceByDate(dateStr)
+      }
+      exportAttendanceExcel({
+        date: dateStr,
+        students,
+        attendance: attData
+      })
+    } catch (e) {
+      console.error(`Failed to export attendance for ${dateStr}`, e)
+    } finally {
+      setExportingDate(null)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="bg-card rounded-card shadow-modal w-full max-w-4xl h-[85vh] flex flex-col animate-scale-in" onClick={e => e.stopPropagation()}>
@@ -45,7 +229,7 @@ function HistoryModal({ onClose, students }) {
             </div>
             <div>
               <h2 className="text-base font-black text-text-primary">Attendance History</h2>
-              <p className="text-xs text-text-muted mt-0.5">Search and view past attendance logs</p>
+              <p className="text-xs text-text-muted mt-0.5">Search, view, and download past attendance logs</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl bg-background hover:bg-gray-100 transition-colors">
@@ -63,7 +247,7 @@ function HistoryModal({ onClose, students }) {
               <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
               <input
                 type="date"
-                className="input pl-10 py-2.5"
+                className="input pl-10 py-2.5 text-xs"
                 value={searchDate}
                 onChange={e => setSearchDate(e.target.value)}
               />
@@ -92,17 +276,18 @@ function HistoryModal({ onClose, students }) {
                 filteredHistory.map(item => {
                   const isSelected = selectedRecord?.date === item.date
                   return (
-                    <button
+                    <div
                       key={item.date}
                       onClick={() => {
                         setSelectedRecord(item)
                         // Auto-select forenoon on date switch
                         setSelectedSession('forenoon')
                       }}
-                      className={`w-full text-left card border p-4 flex items-center justify-between transition-all active:scale-98
-                        ${isSelected
+                      className={`w-full text-left card border p-3.5 flex items-center justify-between transition-all active:scale-98 cursor-pointer group ${
+                        isSelected
                           ? 'border-primary bg-primary-light/30 shadow-sm'
-                          : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'}`}
+                          : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+                      }`}
                     >
                       <div>
                         <p className="text-sm font-bold text-text-primary">
@@ -112,8 +297,27 @@ function HistoryModal({ onClose, students }) {
                           {format(parseISO(item.date), 'EEEE')}
                         </p>
                       </div>
-                      <ChevronRight className={`w-4 h-4 transition-colors ${isSelected ? 'text-primary' : 'text-text-muted'}`} />
-                    </button>
+                      
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleExportDate(item.date, item)
+                          }}
+                          disabled={exportingDate === item.date}
+                          className="p-1.5 rounded-lg bg-white/80 border border-gray-200 text-gray-500 hover:text-green-700 hover:bg-green-50 hover:border-green-300 transition-colors shadow-2xs"
+                          title={`Download ${item.date} Attendance Excel`}
+                        >
+                          {exportingDate === item.date ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-green-600" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <ChevronRight className={`w-4 h-4 transition-colors ${isSelected ? 'text-primary' : 'text-text-muted'}`} />
+                      </div>
+                    </div>
                   )
                 })
               )}
@@ -135,19 +339,38 @@ function HistoryModal({ onClose, students }) {
                     </p>
                   </div>
 
-                  {/* Session Toggle buttons */}
-                  <div className="flex bg-card border border-gray-200 rounded-xl p-1 shadow-sm w-fit">
-                    {['forenoon', 'afternoon'].map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setSelectedSession(s)}
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all capitalize
-                          ${selectedSession === s ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
-                      >
-                        {s === 'forenoon' ? <Sun className="w-3.5 h-3.5" /> : <Sunset className="w-3.5 h-3.5" />}
-                        {s}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Export Excel Button for Active Date */}
+                    <button
+                      type="button"
+                      onClick={() => handleExportDate(selectedRecord.date, selectedRecord)}
+                      disabled={exportingDate === selectedRecord.date}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      title="Download this date as Excel (.xlsx)"
+                    >
+                      {exportingDate === selectedRecord.date ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-green-600" />
+                      )}
+                      <span>Export Excel</span>
+                    </button>
+
+                    {/* Session Toggle buttons */}
+                    <div className="flex bg-card border border-gray-200 rounded-xl p-1 shadow-sm w-fit">
+                      {['forenoon', 'afternoon'].map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setSelectedSession(s)}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all capitalize cursor-pointer ${
+                            selectedSession === s ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text-primary'
+                          }`}
+                        >
+                          {s === 'forenoon' ? <Sun className="w-3.5 h-3.5" /> : <Sunset className="w-3.5 h-3.5" />}
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -160,19 +383,21 @@ function HistoryModal({ onClose, students }) {
                     return (
                       <div
                         key={rec.studentId}
-                        className={`flex items-center justify-between p-3.5 rounded-2xl border
-                          ${isPresent
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border ${
+                          isPresent
                             ? 'bg-success-soft/20 border-green-100'
-                            : 'bg-danger-soft/20 border-red-100'}`}
+                            : 'bg-danger-soft/20 border-red-100'
+                        }`}
                       >
                         <div>
                           <p className="text-sm font-semibold text-text-primary">{stu.name}</p>
                           <p className="text-[10px] font-mono text-text-muted mt-0.5">{stu.registerNumber}</p>
                         </div>
-                        <span className={`text-[10px] font-black px-3 py-1 rounded-full
-                          ${isPresent
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-full ${
+                          isPresent
                             ? 'bg-success text-white'
-                            : 'bg-danger text-white'}`}>
+                            : 'bg-danger text-white'
+                        }`}>
                           {isPresent ? 'Present' : 'Absent'}
                         </span>
                       </div>
@@ -185,7 +410,7 @@ function HistoryModal({ onClose, students }) {
                 <History className="w-12 h-12 mb-3 opacity-20 text-primary animate-pulse" />
                 <p className="text-sm font-semibold text-text-primary">Select a Date</p>
                 <p className="text-xs text-text-muted mt-1 max-w-xs">
-                  Choose an attendance register record from the list on the left to view detail logs.
+                  Choose an attendance register record from the list on the left to view detail logs or download Excel reports.
                 </p>
               </div>
             )}
@@ -205,6 +430,7 @@ export default function Attendance() {
   const [saved, setSaved] = useState(false)
   const [records, setRecords] = useState({ forenoon: {}, afternoon: {} })
   const [showHistory, setShowHistory] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   const activeSession = getAutoSession()
 
@@ -265,28 +491,37 @@ export default function Attendance() {
       {/* Page Header with action buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="page-title">Mark Attendance</h1>
+            
             <button
               onClick={() => setShowHistory(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-primary-light hover:bg-primary-muted text-primary text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 mt-1 border border-primary/15"
+              className="flex items-center gap-1.5 px-3 py-1 bg-primary-light hover:bg-primary-muted text-primary text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 mt-1 border border-primary/15 cursor-pointer"
             >
               <History className="w-3.5 h-3.5" /> History
+            </button>
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 mt-1 border border-green-200 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Download Excel
             </button>
           </div>
           <p className="page-subtitle">{format(new Date(), 'EEEE, dd MMMM yyyy')} • {sessionLabel} Session</p>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => handleMarkAll('PRESENT')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-success-soft text-green-700 text-xs font-bold rounded-xl hover:bg-green-100 transition-colors border border-green-200"
+            className="flex items-center gap-1.5 px-3 py-2 bg-success-soft text-green-700 text-xs font-bold rounded-xl hover:bg-green-100 transition-colors border border-green-200 cursor-pointer"
           >
             <span className="w-5 h-5 rounded bg-success text-white flex items-center justify-center text-[10px] font-black">P</span>
             All Present
           </button>
           <button
             onClick={() => handleMarkAll('ABSENT')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-danger-soft text-red-700 text-xs font-bold rounded-xl hover:bg-red-100 transition-colors border border-red-200"
+            className="flex items-center gap-1.5 px-3 py-2 bg-danger-soft text-red-700 text-xs font-bold rounded-xl hover:bg-red-100 transition-colors border border-red-200 cursor-pointer"
           >
             <span className="w-5 h-5 rounded bg-danger text-white flex items-center justify-center text-[10px] font-black">A</span>
             All Absent
@@ -294,7 +529,7 @@ export default function Attendance() {
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="btn-primary flex items-center gap-2 text-sm"
+            className="btn-primary flex items-center gap-2 text-sm cursor-pointer"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Submit Attendance
@@ -346,8 +581,9 @@ export default function Attendance() {
             return (
               <div
                 key={student.id}
-                className={`grid grid-cols-[1fr_140px] sm:grid-cols-[50px_1fr_150px_170px] items-center px-4 sm:px-6 py-3 transition-colors
-                  ${isPresent ? 'hover:bg-success-soft/10' : 'hover:bg-danger-soft/10 bg-red-50/30'}`}
+                className={`grid grid-cols-[1fr_140px] sm:grid-cols-[50px_1fr_150px_170px] items-center px-4 sm:px-6 py-3 transition-colors ${
+                  isPresent ? 'hover:bg-success-soft/10' : 'hover:bg-danger-soft/10 bg-red-50/30'
+                }`}
               >
                 {/* S.No */}
                 <p className="text-xs text-text-muted font-semibold hidden sm:block">{String(idx + 1).padStart(2, '0')}</p>
@@ -365,19 +601,21 @@ export default function Attendance() {
                 <div className="flex items-center justify-center gap-1.5">
                   <button
                     onClick={() => handleToggle(student.id, 'PRESENT')}
-                    className={`px-3 py-1.5 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all
-                      ${isPresent
+                    className={`px-3 py-1.5 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+                      isPresent
                         ? 'bg-success text-white shadow-sm shadow-green-200 scale-105'
-                        : 'bg-white text-text-muted border border-gray-200 hover:border-green-400 hover:text-green-600 hover:bg-success-soft'}`}
+                        : 'bg-white text-text-muted border border-gray-200 hover:border-green-400 hover:text-green-600 hover:bg-success-soft'
+                    }`}
                   >
                     Present
                   </button>
                   <button
                     onClick={() => handleToggle(student.id, 'ABSENT')}
-                    className={`px-3 py-1.5 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all
-                      ${!isPresent
+                    className={`px-3 py-1.5 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+                      !isPresent
                         ? 'bg-danger text-white shadow-sm shadow-red-200 scale-105'
-                        : 'bg-white text-text-muted border border-gray-200 hover:border-red-400 hover:text-red-600 hover:bg-danger-soft'}`}
+                        : 'bg-white text-text-muted border border-gray-200 hover:border-red-400 hover:text-red-600 hover:bg-danger-soft'
+                    }`}
                   >
                     Absent
                   </button>
@@ -400,9 +638,21 @@ export default function Attendance() {
         </div>
       </div>
 
+      {/* Export Modal */}
+      {showExportModal && (
+        <ExportModal
+          onClose={() => setShowExportModal(false)}
+          students={students}
+          todayAttendance={attendance}
+        />
+      )}
+
       {/* History Modal */}
       {showHistory && (
-        <HistoryModal onClose={() => setShowHistory(false)} students={students} />
+        <HistoryModal
+          onClose={() => setShowHistory(false)}
+          students={students}
+        />
       )}
     </div>
   )

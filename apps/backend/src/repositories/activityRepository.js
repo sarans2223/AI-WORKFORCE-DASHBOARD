@@ -1,167 +1,346 @@
 const { query } = require("../db/connection");
 
 /**
- * Repository for PostgreSQL daily_activities table queries
+ * Activity Repository
+ * Handles all PostgreSQL operations for daily_activities.
+ *
+ * Database table:
+ * daily_activities
+ *
+ * Columns:
+ * id
+ * student_id
+ * activity_name
+ * description
+ * start_time
+ * end_time
+ * extended_until
+ * progress
+ * status
+ * completed_at
+ * created_at
+ * updated_at
  */
 
-const findActivityById = async (id) => {
-  const sql = `
-    SELECT id, student_id, activity_name, description, start_time, end_time,
-           original_end_time, extension_duration, status, progress, date, created_at, updated_at
-    FROM daily_activities
-    WHERE id = $1
-    LIMIT 1;
-  `;
-  const result = await query(sql, [id]);
-  return result.rows[0] || null;
-};
-
+// ============================================================
+// GET ALL ACTIVITIES
+// ============================================================
 const findActivities = async (filters = {}) => {
   let sql = `
-    SELECT id, student_id, activity_name, description, start_time, end_time,
-           original_end_time, extension_duration, status, progress, date, created_at, updated_at
+    SELECT
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at
     FROM daily_activities
   `;
+
   const conditions = [];
   const values = [];
 
-  if (filters.student_id) {
+  // Filter by student
+  if (filters.student_id !== undefined && filters.student_id !== null) {
     values.push(filters.student_id);
     conditions.push(`student_id = $${values.length}`);
   }
 
-  if (filters.status) {
-    values.push(filters.status.toUpperCase());
-    conditions.push(`status = $${values.length}`);
-  }
-
+  // Filter by date
   if (filters.date) {
     values.push(filters.date);
-    conditions.push(`date = $${values.length}`);
+    conditions.push(`DATE(start_time) = $${values.length}`);
   }
 
   if (conditions.length > 0) {
-    sql += ` WHERE ` + conditions.join(" AND ");
+    sql += ` WHERE ${conditions.join(" AND ")}`;
   }
 
-  sql += ` ORDER BY created_at DESC;`;
+  sql += ` ORDER BY start_time ASC`;
 
   const result = await query(sql, values);
+
   return result.rows;
 };
 
-const createActivity = async ({
-  student_id,
-  activity_name,
-  description,
-  start_time,
-  end_time,
-  status,
-  progress,
-  date,
-}) => {
+// ============================================================
+// GET ACTIVITY BY ID
+// ============================================================
+const findActivityById = async (id) => {
   const sql = `
-    INSERT INTO daily_activities
-      (student_id, activity_name, description, start_time, end_time, status, progress, date, created_at, updated_at)
-    VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-    RETURNING id, student_id, activity_name, description, start_time, end_time,
-              original_end_time, extension_duration, status, progress, date, created_at, updated_at;
+    SELECT
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at
+    FROM daily_activities
+    WHERE id = $1
+    LIMIT 1;
   `;
+
+  const result = await query(sql, [id]);
+
+  return result.rows[0] || null;
+};
+
+// ============================================================
+// GET ACTIVITIES BY STUDENT ID
+// ============================================================
+const findActivitiesByStudentId = async (studentId) => {
+  const sql = `
+    SELECT
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at
+    FROM daily_activities
+    WHERE student_id = $1
+    ORDER BY start_time ASC;
+  `;
+
+  const result = await query(sql, [studentId]);
+
+  return result.rows;
+};
+
+// ============================================================
+// CREATE ACTIVITY
+// ============================================================
+const createActivity = async (data) => {
+  const sql = `
+    INSERT INTO daily_activities (
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      progress,
+      status,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      NOW(),
+      NOW()
+    )
+    RETURNING
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at;
+  `;
+
   const values = [
-    student_id,
-    activity_name,
-    description || "",
-    start_time,
-    end_time,
-    status || "PLANNED",
-    progress || 0,
-    date || new Date().toISOString().split("T")[0],
+    data.student_id,
+    data.activity_name,
+    data.description || "",
+    data.start_time,
+    data.end_time,
+    data.progress !== undefined ? Number(data.progress) : 0,
+    data.status || "PLANNED",
   ];
+
   const result = await query(sql, values);
+
   return result.rows[0];
 };
 
-const updateActivity = async (id, fields) => {
+// ============================================================
+// UPDATE ACTIVITY
+// ============================================================
+const updateActivity = async (id, data) => {
   const sql = `
     UPDATE daily_activities
-    SET activity_name = COALESCE($1, activity_name),
-        description = COALESCE($2, description),
-        start_time = COALESCE($3, start_time),
-        end_time = COALESCE($4, end_time),
-        status = COALESCE($5, status),
-        progress = COALESCE($6, progress),
-        updated_at = NOW()
+    SET
+      activity_name = COALESCE($1, activity_name),
+      description = COALESCE($2, description),
+      start_time = COALESCE($3, start_time),
+      end_time = COALESCE($4, end_time),
+      status = COALESCE($5, status),
+      progress = COALESCE($6, progress),
+      updated_at = NOW()
     WHERE id = $7
-    RETURNING id, student_id, activity_name, description, start_time, end_time,
-              original_end_time, extension_duration, status, progress, date, created_at, updated_at;
+    RETURNING
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at;
   `;
+
   const values = [
-    fields.activity_name || null,
-    fields.description !== undefined ? fields.description : null,
-    fields.start_time || null,
-    fields.end_time || null,
-    fields.status || null,
-    fields.progress !== undefined ? fields.progress : null,
+    data.activity_name ?? null,
+    data.description ?? null,
+    data.start_time ?? null,
+    data.end_time ?? null,
+    data.status ?? null,
+    data.progress !== undefined ? Number(data.progress) : null,
     id,
   ];
+
   const result = await query(sql, values);
-  return result.rows[0];
+
+  return result.rows[0] || null;
 };
 
-const updateProgress = async (id, { progress, status }) => {
-  let sql = `
-    UPDATE daily_activities
-    SET progress = $1,
-        updated_at = NOW()
-  `;
-  const values = [progress];
+// ============================================================
+// UPDATE PROGRESS
+// ============================================================
+const updateProgress = async (id, data) => {
+  let completedAt = null;
 
-  if (status) {
-    values.push(status);
-    sql += `, status = $${values.length}`;
+  if (Number(data.progress) === 100) {
+    completedAt = new Date();
   }
 
-  values.push(id);
-  sql += ` WHERE id = $${values.length}
-    RETURNING id, student_id, activity_name, description, start_time, end_time,
-              original_end_time, extension_duration, status, progress, date, created_at, updated_at;
-  `;
-
-  const result = await query(sql, values);
-  return result.rows[0];
-};
-
-const extendActivity = async (id, { original_end_time, extension_duration, new_end_time }) => {
   const sql = `
     UPDATE daily_activities
-    SET original_end_time = COALESCE(original_end_time, $1),
-        extension_duration = COALESCE(extension_duration, 0) + $2,
-        end_time = COALESCE($3, end_time),
-        updated_at = NOW()
+    SET
+      progress = $1,
+      status = COALESCE($2, status),
+      completed_at = $3,
+      updated_at = NOW()
     WHERE id = $4
-    RETURNING id, student_id, activity_name, description, start_time, end_time,
-              original_end_time, extension_duration, status, progress, date, created_at, updated_at;
+    RETURNING
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at;
   `;
-  const values = [original_end_time, extension_duration, new_end_time, id];
+
+  const values = [
+    Number(data.progress),
+    data.status || null,
+    completedAt,
+    id,
+  ];
+
   const result = await query(sql, values);
-  return result.rows[0];
+
+  return result.rows[0] || null;
 };
 
+// ============================================================
+// EXTEND ACTIVITY
+// ============================================================
+const extendActivity = async (id, data) => {
+  const sql = `
+    UPDATE daily_activities
+    SET
+      extended_until = $1,
+      updated_at = NOW()
+    WHERE id = $2
+    RETURNING
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at;
+  `;
+
+  const values = [
+    data.new_end_time,
+    id,
+  ];
+
+  const result = await query(sql, values);
+
+  return result.rows[0] || null;
+};
+
+// ============================================================
+// DELETE ACTIVITY
+// ============================================================
 const deleteActivity = async (id) => {
   const sql = `
     DELETE FROM daily_activities
     WHERE id = $1
-    RETURNING id, student_id, activity_name, description, start_time, end_time,
-              original_end_time, extension_duration, status, progress, date, created_at, updated_at;
+    RETURNING
+      id,
+      student_id,
+      activity_name,
+      description,
+      start_time,
+      end_time,
+      extended_until,
+      progress,
+      status,
+      completed_at,
+      created_at,
+      updated_at;
   `;
+
   const result = await query(sql, [id]);
-  return result.rows[0];
+
+  return result.rows[0] || null;
 };
 
+// ============================================================
+// EXPORTS
+// ============================================================
 module.exports = {
-  findActivityById,
   findActivities,
+  findActivityById,
+  findActivitiesByStudentId,
   createActivity,
   updateActivity,
   updateProgress,

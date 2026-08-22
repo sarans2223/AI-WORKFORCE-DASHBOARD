@@ -10,41 +10,75 @@ import { activityService } from '../services/activityService'
 export default function DailyPlan() {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editActivity, setEditActivity] = useState(null)
   const [extendActivity, setExtendActivity] = useState(null)
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const loadActivities = useCallback(async () => {
-    const data = await activityService.getByDate(today)
-    setActivities(data)
-    setLoading(false)
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await activityService.getByDate(today)
+      setActivities(data)
+    } catch (err) {
+      setError(err.message || 'Failed to load activities')
+    } finally {
+      setLoading(false)
+    }
   }, [today])
 
   useEffect(() => { loadActivities() }, [loadActivities])
 
   const handleSave = async (formData) => {
-    if (editActivity) {
-      const updated = await activityService.update(editActivity.id, formData)
-      setActivities(prev => prev.map(a => a.id === editActivity.id ? updated : a))
-    } else {
-      const created = await activityService.create({ ...formData, date: today })
-      setActivities(prev => [created, ...prev])
+    try {
+      if (editActivity) {
+        const updated = await activityService.update(editActivity.id, formData)
+        setActivities(prev => prev.map(a => a.id === editActivity.id ? updated : a))
+      } else {
+        const created = await activityService.create({ ...formData, date: today })
+        setActivities(prev => [created, ...prev])
+      }
+      setEditActivity(null)
+    } catch (err) {
+      alert(err.message || 'Failed to save activity')
     }
-    setEditActivity(null)
   }
 
   const handleExtend = async (id, extendedEndTime, reason) => {
-    const updated = await activityService.extendTime(id, extendedEndTime, reason)
-    setActivities(prev => prev.map(a => a.id === id ? updated : a))
+    try {
+      const updated = await activityService.extendTime(id, extendedEndTime, reason)
+      setActivities(prev => prev.map(a => a.id === id ? updated : a))
+    } catch (err) {
+      alert(err.message || 'Failed to extend activity time')
+    }
+  }
+
+  const handleComplete = async (id) => {
+    try {
+      const updated = await activityService.update(id, { status: 'COMPLETED', progress: 100 })
+      setActivities(prev => prev.map(a => a.id === id ? updated : a))
+    } catch (err) {
+      alert(err.message || 'Failed to mark activity as completed')
+    }
   }
 
   const handleDelete = async (id) => {
-    await activityService.delete(id)
-    setActivities(prev => prev.filter(a => a.id !== id))
+    if (!window.confirm('Are you sure you want to delete this activity?')) return
+    try {
+      await activityService.delete(id)
+      setActivities(prev => prev.filter(a => a.id !== id))
+    } catch (err) {
+      alert(err.message || 'Failed to delete activity')
+    }
   }
 
   const openEdit = (activity) => {
+    if (activity.status === 'COMPLETED') {
+      alert('Completed activities cannot be edited.')
+      return
+    }
     setEditActivity(activity)
     setShowForm(true)
   }
@@ -58,6 +92,17 @@ export default function DailyPlan() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="card p-6 border border-red-200 text-center space-y-4 max-w-md mx-auto mt-10">
+        <p className="text-red-500 font-semibold">{error}</p>
+        <button onClick={loadActivities} className="btn-primary text-xs px-4 py-2">
+          Try Again
+        </button>
       </div>
     )
   }
@@ -119,6 +164,7 @@ export default function DailyPlan() {
               onExtend={(a) => setExtendActivity(a)}
               onEdit={openEdit}
               onDelete={handleDelete}
+              onComplete={handleComplete}
             />
           ))}
         </div>
@@ -131,6 +177,7 @@ export default function DailyPlan() {
         onSave={handleSave}
         editActivity={editActivity}
       />
+
       <ActivityExtension
         open={!!extendActivity}
         onClose={() => setExtendActivity(null)}

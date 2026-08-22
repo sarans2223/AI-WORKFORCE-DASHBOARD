@@ -4,7 +4,7 @@ import LeaveForm from '../components/leave/LeaveForm'
 import LeaveHistory from '../components/leave/LeaveHistory'
 import { leaveService } from '../services/leaveService'
 
-const TABS = ['Apply Leave', 'Leave History']
+const TABS = ['Log Leave', 'Leave History']
 
 export default function Leave() {
   const [tab, setTab] = useState(0)
@@ -37,7 +37,7 @@ export default function Leave() {
       {/* Header */}
       <div className="page-header">
         <h1 className="page-title">Leave</h1>
-        <p className="page-subtitle">Apply for leave and view your leave history</p>
+        <p className="page-subtitle">Log and view your leave records</p>
       </div>
 
       {/* Tabs */}
@@ -71,7 +71,7 @@ export default function Leave() {
               <FileText className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text-primary">Apply for Leave</h2>
+              <h2 className="text-sm font-bold text-text-primary">Log a Leave</h2>
               <p className="text-xs text-text-muted">Fill in the details below</p>
             </div>
           </div>

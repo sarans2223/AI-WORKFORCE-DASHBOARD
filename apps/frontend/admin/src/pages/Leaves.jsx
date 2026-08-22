@@ -17,7 +17,7 @@ export default function Leaves() {
   }, [])
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const isUpcoming = (l) => l.startDate >= todayStr
+  const isUpcoming = (l) => l.startDate > todayStr
   const isPast = (l) => l.endDate < todayStr
 
   const filteredLeaves = leaves.filter(lv => {
@@ -79,6 +79,11 @@ export default function Leaves() {
               <div className="bg-background rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-1">Leave Period</p>
                 <p className="text-sm font-bold text-text-primary">{selected.startDate} → {selected.endDate}</p>
+                {selected.fromTime && selected.toTime && (
+                  <p className="text-xs font-semibold text-text-secondary mt-1">
+                    Timing: {selected.fromTime} - {selected.toTime}
+                  </p>
+                )}
               </div>
               <div className="bg-background rounded-xl p-4">
                 <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-1">Reason</p>

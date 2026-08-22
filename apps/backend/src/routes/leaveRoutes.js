@@ -1,61 +1,77 @@
 const leaveController = require("../controllers/leaveController");
 
 /**
- * Route handler for Leave Management endpoints
+ * Route handler for Leave Monitoring endpoints
  *
  * Routes:
- *   POST   /api/leave              - Apply for leave
- *   GET    /api/leave              - Get all leave applications (filters: student_id, status, start_date, end_date)
- *   GET    /api/leave/:id          - Get a specific leave application
- *   PUT    /api/leave/:id          - Update a PENDING leave application
- *   PATCH  /api/leave/:id/cancel   - Cancel a leave application (soft-cancel, status → CANCELLED)
+ *   POST /api/leave       - Submit a leave record
+ *   GET  /api/leave       - Get leave records
+ *   GET  /api/leave/:id   - Get a specific leave record
+ *
+ * This is a MONITORING application.
+ * No approve, reject, cancel, or update operations are provided.
  */
-const handleLeaveRoutes = async (req, res, pathName, method, queryParams = {}) => {
-  // 1. Exact match /api/leave
+
+const handleLeaveRoutes = async (
+  req,
+  res,
+  pathName,
+  method,
+  queryParams = {}
+) => {
+  // ============================================================
+  // /api/leave
+  // ============================================================
   if (pathName === "/api/leave" || pathName === "/api/leave/") {
+
+    // Submit leave record
     if (method === "POST") {
       await leaveController.applyForLeave(req, res);
       return true;
     }
+
+    // View leave records
     if (method === "GET") {
-      await leaveController.getLeaveApplications(req, res, queryParams);
+      await leaveController.getLeaveApplications(
+        req,
+        res,
+        queryParams
+      );
       return true;
     }
   }
 
-  // 2. Parametrized /api/leave/:id
+  // ============================================================
+  // /api/leave/:id
+  // ============================================================
   if (pathName.startsWith("/api/leave/")) {
-    const idSegment = pathName.substring("/api/leave/".length);
+
+    const idSegment = pathName.substring(
+      "/api/leave/".length
+    );
+
     const parts = idSegment.split("/").filter(Boolean);
 
-    // /api/leave/:id
+    // GET /api/leave/:id
     if (parts.length === 1) {
+
       const id = decodeURIComponent(parts[0]);
 
       if (method === "GET") {
-        await leaveController.getLeaveById(req, res, id);
-        return true;
-      }
-      if (method === "PUT") {
-        await leaveController.updateLeaveApplication(req, res, id);
-        return true;
-      }
-      // Allow DELETE as a hard-delete alias (same as cancel for now)
-      if (method === "DELETE") {
-        await leaveController.cancelLeaveApplication(req, res, id);
-        return true;
-      }
-    }
-
-    // /api/leave/:id/cancel  (PATCH)
-    if (parts.length === 2 && parts[1] === "cancel") {
-      const id = decodeURIComponent(parts[0]);
-      if (method === "PATCH" || method === "PUT") {
-        await leaveController.cancelLeaveApplication(req, res, id);
+        await leaveController.getLeaveById(
+          req,
+          res,
+          id
+        );
         return true;
       }
     }
   }
+
+  // ============================================================
+  // Any PUT / PATCH / DELETE request is intentionally rejected
+  // because this application is for MONITORING only.
+  // ============================================================
 
   return false;
 };

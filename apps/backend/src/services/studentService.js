@@ -1,5 +1,7 @@
 const studentRepository = require("../repositories/studentRepository");
+const userRepository = require("../repositories/userRepository");
 const { validateCreateStudent, validateUpdateStudent } = require("../validators/studentValidator");
+const bcrypt = require("bcryptjs");
 
 /**
  * Service handling Student Management business logic
@@ -38,6 +40,16 @@ const createStudent = async (studentData) => {
 
   // 5. Save to PostgreSQL database
   const createdStudent = await studentRepository.createStudent(validated);
+
+  // 6. Automatically generate user login credentials using roll number (register_number) as password
+  const passwordHash = await bcrypt.hash(createdStudent.register_number, 10);
+  await userRepository.createUser({
+    email: createdStudent.email,
+    password: passwordHash,
+    role: "STUDENT",
+    studentId: createdStudent.id
+  });
+
   return createdStudent;
 };
 

@@ -2,8 +2,9 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, FileText, MapPin, LogOut,
-  Menu, X, ClipboardCheck, ClipboardList
+  Menu, X, ClipboardCheck, ClipboardList, ShieldCheck
 } from 'lucide-react'
+import { useAdminAuth } from '../../contexts/AdminAuthContext'
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/passes', icon: MapPin, label: 'Movement Pass' },
   { to: '/leaves', icon: FileText, label: 'Leaves' },
+  { to: '/admins', icon: ShieldCheck, label: 'Manage Admins' },
 ]
 
 const BOTTOM_ITEMS = [
@@ -24,8 +26,10 @@ const BOTTOM_ITEMS = [
 export default function AdminShell({ children, adminName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
+  const { logout } = useAdminAuth()
 
   const handleLogout = () => {
+    logout()
     navigate('/login')
   }
 

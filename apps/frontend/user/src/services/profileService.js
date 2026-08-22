@@ -1,21 +1,40 @@
-import { mockProfile } from '../data/mockData'
+import { api, getStudentDbId } from './api'
 
-let profile = { ...mockProfile }
-const delay = (ms = 300) => new Promise(r => setTimeout(r, ms))
+const normalize = (student) => {
+  if (!student) return null
+  return {
+    id: student.student_id || student.register_number,
+    name: student.name,
+    registerNumber: student.register_number,
+    email: student.email,
+    phone: student.phone || '',
+    github: student.github_url || '',
+    department: 'Computer Science',
+    year: '3rd Year',
+    section: 'A'
+  }
+}
 
 export const profileService = {
   get: async () => {
-    await delay()
-    return { ...profile }
+    const studentId = await getStudentDbId()
+    const response = await api.get(`/students/${studentId}`)
+    return normalize(response.data || response)
   },
 
   update: async (updates) => {
-    await delay()
-    // Only allowed fields: name, email, phone, github
-    const { name, email, phone, github } = updates
-    profile = { ...profile, name, email, phone, github }
+    const studentId = await getStudentDbId()
+    const payload = {
+      name: updates.name,
+      email: updates.email,
+      phone: updates.phone,
+      github_url: updates.github
+    }
+    const response = await api.put(`/students/${studentId}`, payload)
+    const profile = normalize(response.data || response)
+    
     const stored = JSON.parse(localStorage.getItem('student_user') || '{}')
     localStorage.setItem('student_user', JSON.stringify({ ...stored, ...profile }))
-    return { ...profile }
-  },
+    return profile
+  }
 }

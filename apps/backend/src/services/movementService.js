@@ -22,8 +22,8 @@ const createMovementPass = async (passData) => {
   // 3. Check for overlapping pass (excluding CANCELLED and REJECTED)
   const overlap = await movementRepository.findOverlappingMovementPass(
     validated.student_id,
-    validated.out_time,
-    validated.in_time
+    validated.pass_date,
+    validated.slot_id
   );
   if (overlap) {
     const error = new Error(
@@ -35,7 +35,10 @@ const createMovementPass = async (passData) => {
   }
 
   // 4. Create pass in PostgreSQL
-  const created = await movementRepository.createMovementPass(validated);
+  const created = await movementRepository.createMovementPass({
+    ...validated,
+    reason: validated.purpose
+  });
   return created;
 };
 

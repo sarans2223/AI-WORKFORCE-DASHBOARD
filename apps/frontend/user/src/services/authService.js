@@ -1,18 +1,18 @@
-import { mockProfile } from '../data/mockData'
+import { api } from './api'
 
 let currentUser = null
 
 export const authService = {
   login: async (email, password) => {
-    // Mock auth — replace with api.post('/auth/login', { email, password })
-    await new Promise(r => setTimeout(r, 800))
-    if (email && password) {
-      currentUser = { ...mockProfile, email, name: email.split('@')[0], token: 'mock-jwt-token' }
-      localStorage.setItem('student_token', currentUser.token)
-      localStorage.setItem('student_user', JSON.stringify(currentUser))
-      return currentUser
+    if (!email || !password) {
+      throw new Error('Email and password are required')
     }
-    throw new Error('Email and password are required')
+    const response = await api.post('/auth/login', { email, password })
+    const { token, user } = response.data
+    currentUser = user
+    localStorage.setItem('student_token', token)
+    localStorage.setItem('student_user', JSON.stringify(user))
+    return user
   },
 
   logout: () => {

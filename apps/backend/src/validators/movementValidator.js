@@ -2,7 +2,7 @@
  * Validator for Movement Pass Management API requests
  */
 
-const ALLOWED_PASS_TYPES = ["CAMPUS_LEAVE", "LAB_ACCESS", "OUTSTATION", "OTHER"];
+const ALLOWED_PASS_TYPES = ["CAMPUS_LEAVE", "LAB_ACCESS", "OUTSTATION", "OTHER", "PS_SLOT", "IECC", "LIBRARY", "RESEARCH_PARK", "MC"];
 const ALLOWED_PASS_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"];
 
 const validateCreateMovementPass = (data) => {
@@ -78,6 +78,8 @@ const validateCreateMovementPass = (data) => {
     pass_type,
     destination,
     status: "PENDING",
+    pass_date: out_time.split('T')[0],
+    slot_id: data.slot_id ? parseInt(data.slot_id, 10) : null,
   };
 };
 

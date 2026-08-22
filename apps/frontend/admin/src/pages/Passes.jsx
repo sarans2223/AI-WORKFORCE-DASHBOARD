@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react'
-import { MapPin, Clock, User } from 'lucide-react'
+import { MapPin, Clock, User, Calendar } from 'lucide-react'
 import { adminService } from '../services/adminService'
-import { format } from 'date-fns'
-
-const todayStr = format(new Date(), 'yyyy-MM-dd')
 
 export default function Passes() {
   const [passes, setPasses] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ALL')
 
-  useEffect(() => {
+  const loadPasses = () => {
     adminService.getPasses().then(data => {
       setPasses(data)
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    loadPasses()
   }, [])
 
   const filtered = filter === 'ALL' ? passes : passes.filter(p => p.status === filter)
@@ -33,60 +34,109 @@ export default function Passes() {
         <p className="page-subtitle">{activeCnt} active pass{activeCnt !== 1 ? 'es' : ''} right now</p>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2">
-        {['ALL', 'ACTIVE', 'EXPIRED'].map(f => (
+      {/* Filter Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { key: 'ALL', label: 'All Passes' },
+          { key: 'ACTIVE', label: 'Active' },
+          { key: 'UPCOMING', label: 'Upcoming' },
+          { key: 'EXPIRED', label: 'Expired' },
+        ].map(f => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all
-              ${filter === f ? 'bg-primary text-white shadow-sm' : 'bg-card text-text-muted hover:text-text-primary border border-gray-100'}`}
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer
+              ${filter === f.key ? 'bg-primary text-white shadow-sm' : 'bg-card text-text-muted hover:text-text-primary border border-gray-150'}`}
           >
-            {f === 'ALL' ? 'All Passes' : f === 'ACTIVE' ? 'Active' : 'Expired'}
+            {f.label} ({f.key === 'ALL' ? passes.length : passes.filter(p => p.status === f.key).length})
           </button>
         ))}
       </div>
 
       {/* Pass cards */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(pass => (
-          <div key={pass.id} className={`card border transition-all
-            ${pass.status === 'ACTIVE' ? 'border-blue-100 bg-info-soft/20' : 'border-gray-100'}`}>
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-                  ${pass.status === 'ACTIVE' ? 'bg-info-soft' : 'bg-background'}`}>
-                  <MapPin className={`w-5 h-5 ${pass.status === 'ACTIVE' ? 'text-blue-600' : 'text-text-muted'}`} />
+          <div
+            key={pass.id}
+            className={`card border transition-all flex flex-col justify-between p-5 bg-card hover:-translate-y-0.5 ${
+              pass.status === 'ACTIVE'
+                ? 'border-primary/40 shadow-xs'
+                : 'border-gray-150'
+            }`}
+          >
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      pass.status === 'ACTIVE'
+                        ? 'bg-primary text-white shadow-xs'
+                        : pass.status === 'UPCOMING'
+                        ? 'bg-primary-light text-primary'
+                        : 'bg-gray-100 text-text-muted'
+                    }`}
+                  >
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-text-primary truncate">{pass.studentName}</p>
+                    <p className="text-xs text-text-muted font-mono">{pass.registerNumber}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-text-primary">{pass.studentName}</p>
-                  <p className="text-xs text-text-muted">{pass.registerNumber}</p>
-                </div>
+
+                <span
+                  className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex-shrink-0 flex items-center gap-1.5 ${
+                    pass.status === 'ACTIVE'
+                      ? 'bg-primary text-white shadow-xs'
+                      : pass.status === 'UPCOMING'
+                      ? 'bg-primary-light text-primary border border-primary/20 font-bold'
+                      : 'bg-gray-100 text-text-muted border border-gray-200 font-semibold'
+                  }`}
+                >
+                  {pass.status === 'ACTIVE' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  )}
+                  {pass.status}
+                </span>
               </div>
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-badge flex-shrink-0
-                ${pass.status === 'ACTIVE' ? 'bg-info-soft text-blue-700' : 'bg-background text-text-muted'}`}>
-                {pass.status}
+
+              <div className="space-y-1.5 bg-background p-3 rounded-xl border border-gray-100">
+                <div className="flex items-center gap-2 text-xs">
+                  <Clock className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                  <span className="font-bold text-text-primary">{pass.movementType}</span>
+                  <span className="text-text-muted">•</span>
+                  <span className={pass.status === 'ACTIVE' ? 'font-bold text-primary' : 'font-medium text-text-secondary'}>
+                    {pass.timing}
+                  </span>
+                </div>
+                {pass.reason && (
+                  <div className="flex items-start gap-2 text-xs text-text-secondary">
+                    <MapPin className="w-3.5 h-3.5 text-text-muted mt-0.5 flex-shrink-0" />
+                    <span className="leading-snug">{pass.reason}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] text-text-muted font-medium">
+              <span className="flex items-center gap-1 font-mono">
+                <Calendar className="w-3 h-3 text-text-muted" /> Date: {pass.date}
               </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-text-secondary">
-                <Clock className="w-3.5 h-3.5 text-text-muted" />
-                <span>{pass.movementType} • {pass.timing}</span>
-              </div>
-              <div className="flex items-start gap-2 text-xs text-text-secondary">
-                <MapPin className="w-3.5 h-3.5 text-text-muted mt-0.5" />
-                <span>{pass.reason}</span>
-              </div>
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-gray-50">
-              <p className="text-[10px] text-text-muted">Date: {pass.date}</p>
+              {pass.slot && (
+                <span className={`text-[9px] px-2 py-0.5 rounded font-semibold ${
+                  pass.status === 'ACTIVE' || pass.status === 'UPCOMING'
+                    ? 'bg-primary-light text-primary font-bold'
+                    : 'bg-gray-100 text-text-secondary'
+                }`}>
+                  {pass.slot}
+                </span>
+              )}
             </div>
           </div>
         ))}
+
         {filtered.length === 0 && (
-          <div className="col-span-2 card text-center py-12 text-text-muted">
+          <div className="col-span-full card text-center py-12 text-text-muted border border-dashed border-gray-200">
             <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">No passes found</p>
           </div>

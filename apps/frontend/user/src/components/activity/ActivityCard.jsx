@@ -1,19 +1,18 @@
 import React, { useState } from 'react'
-import { Clock, ChevronDown, ChevronUp, Edit3, Timer, Trash2 } from 'lucide-react'
+import { Clock, Edit3, Timer, Trash2, CheckCircle2 } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
 
-export default function ActivityCard({ activity, onExtend, onEdit, onDelete }) {
-  const [expanded, setExpanded] = useState(false)
-
+export default function ActivityCard({ activity, onExtend, onEdit, onDelete, onComplete }) {
   const { name, startTime, endTime, extendedEndTime, status, extensionReason } = activity
 
   const displayEndTime = extendedEndTime || endTime
+  const isCompleted = status === 'COMPLETED'
 
   return (
-    <div className="card border border-gray-100 hover:border-primary/20 transition-all duration-200">
+    <div className={`card border transition-all duration-200 ${isCompleted ? 'border-emerald-200/80 bg-emerald-50/10' : 'border-gray-100 hover:border-primary/20'}`}>
       {/* Status indicator strip */}
       <div className={`-mx-5 -mt-5 mb-4 h-1 rounded-t-card ${
-        status === 'COMPLETED' ? 'bg-success' :
+        isCompleted ? 'bg-success' :
         status === 'IN_PROGRESS' ? 'bg-primary' :
         status === 'INCOMPLETE' ? 'bg-danger' :
         'bg-primary-muted'
@@ -52,32 +51,62 @@ export default function ActivityCard({ activity, onExtend, onEdit, onDelete }) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {(status === 'IN_PROGRESS' || status === 'PLANNED') && !extendedEndTime && (
+      <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-gray-100/70">
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isCompleted && (
+            <>
+              {/* Option to click if it's completed */}
+              <button
+                id={`complete-${activity.id}`}
+                onClick={() => onComplete && onComplete(activity.id)}
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 font-bold transition-all shadow-2xs cursor-pointer"
+                title="Mark activity as completed"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Complete
+              </button>
+
+              {/* Extend option */}
+              {(status === 'IN_PROGRESS' || status === 'PLANNED') && !extendedEndTime && (
+                <button
+                  id={`extend-${activity.id}`}
+                  onClick={() => onExtend(activity)}
+                  className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 cursor-pointer"
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  Extend
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+
+        <div className="flex items-center gap-1.5">
+          {/* Edit option — only available when NOT completed */}
+          {!isCompleted && (
+            <button
+              onClick={() => onEdit(activity)}
+              className="btn-icon p-2 hover:bg-gray-100 transition-colors"
+              aria-label="Edit activity"
+              title="Edit activity"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Delete option */}
           <button
-            id={`extend-${activity.id}`}
-            onClick={() => onExtend(activity)}
-            className="btn-secondary text-xs px-3 py-2 flex items-center gap-1"
+            onClick={() => onDelete(activity.id)}
+            className="p-2 rounded-xl hover:bg-danger-soft text-text-secondary hover:text-red-500 transition-colors cursor-pointer"
+            aria-label="Delete activity"
+            title="Delete activity"
           >
-            <Timer className="w-3.5 h-3.5" />
-            Extend
+            <Trash2 className="w-4 h-4" />
           </button>
-        )}
-        <button
-          onClick={() => onEdit(activity)}
-          className="btn-icon p-2"
-          aria-label="Edit activity"
-        >
-          <Edit3 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => onDelete(activity.id)}
-          className="p-2 rounded-xl hover:bg-danger-soft text-text-secondary hover:text-red-500 transition-colors"
-          aria-label="Delete activity"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        </div>
       </div>
     </div>
   )
 }
+

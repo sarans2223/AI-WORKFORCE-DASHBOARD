@@ -19,13 +19,14 @@ const markAttendance = async (attendanceData) => {
     throw error;
   }
 
-  // 3. Check for duplicate attendance record for the same student and date
+  // 3. Check for duplicate attendance record for the same student, date, and session
   const existingRecord = await attendanceRepository.findAttendanceByStudentAndDate(
     validated.student_id,
-    validated.date
+    validated.date,
+    validated.session
   );
   if (existingRecord) {
-    const error = new Error("Attendance already exists for this student and date");
+    const error = new Error("Attendance already exists for this student, date, and session");
     error.statusCode = 409;
     error.errorCode = "DUPLICATE_ATTENDANCE";
     throw error;
@@ -80,14 +81,18 @@ const updateAttendance = async (id, updateData) => {
   // 2. Validate update data
   const validated = validateUpdateAttendance(updateData);
 
-  // 3. Check for duplicate date if date is being updated to another date
-  if (validated.date && validated.date !== existingRecord.date) {
+  // 3. Check for duplicate date/session if updated
+  if ((validated.date && validated.date !== existingRecord.date) || 
+      (validated.session && validated.session !== existingRecord.session)) {
+    const checkDate = validated.date || existingRecord.date;
+    const checkSession = validated.session || existingRecord.session;
     const duplicate = await attendanceRepository.findAttendanceByStudentAndDate(
       existingRecord.student_id,
-      validated.date
+      checkDate,
+      checkSession
     );
     if (duplicate) {
-      const error = new Error("Attendance already exists for this student and date");
+      const error = new Error("Attendance already exists for this student, date, and session");
       error.statusCode = 409;
       error.errorCode = "DUPLICATE_ATTENDANCE";
       throw error;

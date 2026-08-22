@@ -14,6 +14,18 @@ const handleAuthRoutes = async (req, res, pathName, method) => {
     return true;
   }
 
+  // Admin management: List all admins
+  if (method === "GET" && (pathName === "/api/auth/admins" || pathName === "/api/auth/admins/")) {
+    await authController.listAdmins(req, res);
+    return true;
+  }
+
+  // Admin management: Create a new admin account
+  if (method === "POST" && (pathName === "/api/auth/admins" || pathName === "/api/auth/admins/")) {
+    await authController.createAdmin(req, res);
+    return true;
+  }
+
   return false;
 };
 

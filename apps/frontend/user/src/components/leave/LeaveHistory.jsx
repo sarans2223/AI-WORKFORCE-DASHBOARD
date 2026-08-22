@@ -1,5 +1,5 @@
 import React from 'react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, isAfter, isBefore } from 'date-fns'
 import { CalendarDays, Clock } from 'lucide-react'
 import EmptyState from '../common/EmptyState'
 
@@ -14,13 +14,24 @@ export default function LeaveHistory({ leaves }) {
     )
   }
 
+  const now = new Date()
+
+  const getStatus = (lv) => {
+    const start = parseISO(lv.startDate)
+    const end = parseISO(lv.endDate)
+    if (isAfter(start, now)) return { label: 'Upcoming', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+    if (isBefore(end, now)) return { label: 'Past', cls: 'bg-gray-100 text-gray-500 border-gray-200' }
+    return { label: 'Active', cls: 'bg-primary-light text-primary border-primary/20' }
+  }
+
   return (
     <div className="space-y-4">
       {leaves.map(lv => {
         const start = parseISO(lv.startDate)
         const end = parseISO(lv.endDate)
         const days = Math.round((end - start) / 86400000) + 1
-        
+        const status = getStatus(lv)
+
         return (
           <div key={lv.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 transition-all hover:shadow-md hover:border-primary/20 group">
             {/* Calendar Tear-off Style Date */}
@@ -46,17 +57,17 @@ export default function LeaveHistory({ leaves }) {
                   </h3>
                   <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5 font-medium flex-wrap">
                     <Clock className="w-3 h-3" />
-                    <span>Applied on {format(parseISO(lv.submittedOn), 'dd MMM yyyy')}</span>
+                    <span>Logged on {format(parseISO(lv.submittedOn), 'dd MMM yyyy')}</span>
                     {lv.fromTime && lv.toTime && (
                       <>
                         <span className="w-1 h-1 rounded-full bg-gray-300" />
-                        <span>Timing: {lv.fromTime} - {lv.toTime}</span>
+                        <span>{lv.fromTime} – {lv.toTime}</span>
                       </>
                     )}
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold tracking-wide uppercase shadow-sm">
-                  Submitted
+                <span className={`px-2.5 py-1 rounded-full border text-[10px] font-bold tracking-wide uppercase shadow-sm ${status.cls}`}>
+                  {status.label}
                 </span>
               </div>
 

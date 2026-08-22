@@ -8,11 +8,19 @@ import Students from './pages/Students'
 import Leaves from './pages/Leaves'
 import Passes from './pages/Passes'
 import Assign from './pages/Assign'
+import Admins from './pages/Admins'
 import { useAdminAuth } from './contexts/AdminAuthContext'
 import { AdminAuthProvider } from './contexts/AdminAuthContext'
 
 function ProtectedRoute({ children }) {
-  const { admin } = useAdminAuth()
+  const { admin, loading } = useAdminAuth()
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
   if (!admin) return <Navigate to="/login" replace />
   return (
     <AdminShell adminName={admin.name}>
@@ -22,7 +30,14 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { admin } = useAdminAuth()
+  const { admin, loading } = useAdminAuth()
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
   return (
     <Routes>
       <Route path="/login" element={admin ? <Navigate to="/dashboard" replace /> : <Login />} />
@@ -32,6 +47,7 @@ function AppRoutes() {
       <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
       <Route path="/passes" element={<ProtectedRoute><Passes /></ProtectedRoute>} />
       <Route path="/assign" element={<ProtectedRoute><Assign /></ProtectedRoute>} />
+      <Route path="/admins" element={<ProtectedRoute><Admins /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )

@@ -87,7 +87,61 @@ const getCurrentUser = async (identifier) => {
   };
 };
 
+const createAdmin = async ({ email, password, name }) => {
+  if (!email || !password) {
+    const error = new Error("Email and password are required");
+    error.statusCode = 400;
+    error.errorCode = "VALIDATION_ERROR";
+    throw error;
+  }
+
+  // Check if user already exists
+  const existing = await userRepository.findByEmail(email);
+  if (existing) {
+    const error = new Error("An account with this email already exists");
+    error.statusCode = 409;
+    error.errorCode = "EMAIL_EXISTS";
+    throw error;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const newUser = await userRepository.createUser({
+    email: email.toLowerCase(),
+    password: passwordHash,
+    role: "ADMIN",
+    studentId: null,
+  });
+
+  return {
+    id: newUser.id,
+    email: newUser.email,
+    role: newUser.role,
+    createdAt: newUser.created_at,
+  };
+};
+
+const getAllAdmins = async () => {
+  const { query } = require("../db/connection");
+  const sql = `
+    SELECT id, username AS email, user_type AS role, created_at
+    FROM users
+    WHERE user_type = 'ADMIN'
+    ORDER BY created_at DESC;
+  `;
+  const result = await query(sql);
+  return result.rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    role: r.role,
+    name: r.email ? r.email.split("@")[0].charAt(0).toUpperCase() + r.email.split("@")[0].slice(1) : "Admin",
+    createdAt: r.created_at,
+  }));
+};
+
 module.exports = {
   login,
   getCurrentUser,
+  createAdmin,
+  getAllAdmins,
 };

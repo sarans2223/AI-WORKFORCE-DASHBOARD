@@ -67,7 +67,7 @@ export default function LeaveForm({ onSubmit }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       {success && (
         <div className="px-4 py-3 bg-success-soft rounded-xl text-sm text-green-700 font-semibold">
-          ✓ Leave application submitted successfully!
+          ✓ Leave record saved successfully!
         </div>
       )}
 
@@ -145,7 +145,7 @@ export default function LeaveForm({ onSubmit }) {
         className="btn-primary w-full flex items-center justify-center gap-2"
       >
         <CalendarDays className="w-4 h-4" />
-        {saving ? 'Submitting…' : 'Submit Leave'}
+        {saving ? 'Saving…' : 'Log Leave'}
       </button>
     </form>
   )

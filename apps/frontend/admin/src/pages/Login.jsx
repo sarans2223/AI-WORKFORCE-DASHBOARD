@@ -6,7 +6,7 @@ import { Lock, Mail, Shield } from 'lucide-react'
 export default function Login() {
   const { login } = useAdminAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: 'admin@college.edu', password: 'admin123' })
+  const [form, setForm] = useState({ email: 'sushanthi736@gmail.com', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -14,14 +14,14 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    await new Promise(r => setTimeout(r, 600))
-    const success = login(form)
-    if (success) {
+    try {
+      await login(form.email, form.password)
       navigate('/dashboard')
-    } else {
-      setError('Invalid credentials. Please try again.')
+    } catch (err) {
+      setError(err.message || 'Invalid credentials. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -102,10 +102,6 @@ export default function Login() {
             </button>
           </form>
         </div>
-
-        <p className="text-center text-xs text-text-muted mt-6">
-          Any credentials accepted for demo purposes
-        </p>
       </div>
     </div>
   )

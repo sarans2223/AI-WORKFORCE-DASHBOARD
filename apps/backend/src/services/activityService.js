@@ -1,48 +1,19 @@
 const activityRepository = require("../repositories/activityRepository");
-const studentRepository = require("../repositories/studentRepository");
-const {
-  validateCreateActivity,
-  validateUpdateActivity,
-  validateProgressUpdate,
-  validateExtension,
-} = require("../validators/activityValidator");
 
 /**
- * Service for Activity Management Business Logic
+ * Get activities
  */
-
-const createActivity = async (activityData) => {
-  // 1. Validate payload fields
-  const validated = validateCreateActivity(activityData);
-
-  // 2. Verify referenced student exists in PostgreSQL
-  const student = await studentRepository.findStudentByStudentId(validated.student_id);
-  if (!student) {
-    const error = new Error("Referenced student does not exist");
-    error.statusCode = 404;
-    error.errorCode = "STUDENT_NOT_FOUND";
-    throw error;
-  }
-
-  // 3. Create activity in database
-  const activity = await activityRepository.createActivity(validated);
-  return activity;
-};
-
 const getActivities = async (filters = {}) => {
   const activities = await activityRepository.findActivities(filters);
   return activities || [];
 };
 
+/**
+ * Get one activity by ID
+ */
 const getActivityById = async (id) => {
-  if (!id) {
-    const error = new Error("Activity ID is required");
-    error.statusCode = 400;
-    error.errorCode = "VALIDATION_ERROR";
-    throw error;
-  }
-
   const activity = await activityRepository.findActivityById(id);
+
   if (!activity) {
     const error = new Error("Activity not found");
     error.statusCode = 404;
@@ -53,113 +24,81 @@ const getActivityById = async (id) => {
   return activity;
 };
 
-const updateActivity = async (id, updateData) => {
-  if (!id) {
-    const error = new Error("Activity ID is required");
-    error.statusCode = 400;
-    error.errorCode = "VALIDATION_ERROR";
-    throw error;
-  }
+/**
+ * Create activity
+ */
+const createActivity = async (data) => {
+  return await activityRepository.createActivity(data);
+};
 
-  // 1. Verify activity exists
-  const existing = await activityRepository.findActivityById(id);
-  if (!existing) {
+/**
+ * Update activity
+ */
+const updateActivity = async (id, data) => {
+  const activity = await activityRepository.updateActivity(id, data);
+
+  if (!activity) {
     const error = new Error("Activity not found");
     error.statusCode = 404;
     error.errorCode = "ACTIVITY_NOT_FOUND";
     throw error;
   }
 
-  // 2. Validate update data
-  const validated = validateUpdateActivity(updateData);
-
-  // 3. Update activity
-  const updated = await activityRepository.updateActivity(id, validated);
-  return updated;
+  return activity;
 };
 
-const updateProgress = async (id, progressData) => {
-  if (!id) {
-    const error = new Error("Activity ID is required");
-    error.statusCode = 400;
-    error.errorCode = "VALIDATION_ERROR";
-    throw error;
-  }
+/**
+ * Update activity progress
+ */
+const updateProgress = async (id, data) => {
+  const activity = await activityRepository.updateProgress(id, data);
 
-  // 1. Verify activity exists
-  const existing = await activityRepository.findActivityById(id);
-  if (!existing) {
+  if (!activity) {
     const error = new Error("Activity not found");
     error.statusCode = 404;
     error.errorCode = "ACTIVITY_NOT_FOUND";
     throw error;
   }
 
-  // 2. Validate progress update
-  const validated = validateProgressUpdate(progressData);
-
-  // 3. Update progress in database
-  const updated = await activityRepository.updateProgress(id, validated);
-  return updated;
+  return activity;
 };
 
-const extendActivity = async (id, extensionData) => {
-  if (!id) {
-    const error = new Error("Activity ID is required");
-    error.statusCode = 400;
-    error.errorCode = "VALIDATION_ERROR";
-    throw error;
-  }
+/**
+ * Extend activity
+ */
+const extendActivity = async (id, data) => {
+  const activity = await activityRepository.extendActivity(id, data);
 
-  // 1. Verify activity exists
-  const existing = await activityRepository.findActivityById(id);
-  if (!existing) {
+  if (!activity) {
     const error = new Error("Activity not found");
     error.statusCode = 404;
     error.errorCode = "ACTIVITY_NOT_FOUND";
     throw error;
   }
 
-  // 2. Validate extension payload
-  const validated = validateExtension(extensionData);
-
-  const payload = {
-    original_end_time: existing.end_time,
-    extension_duration: validated.extension_duration,
-    new_end_time: validated.new_end_time || existing.end_time,
-  };
-
-  // 3. Extend activity in database
-  const updated = await activityRepository.extendActivity(id, payload);
-  return updated;
+  return activity;
 };
 
+/**
+ * Delete activity
+ */
 const deleteActivity = async (id) => {
-  if (!id) {
-    const error = new Error("Activity ID is required");
-    error.statusCode = 400;
-    error.errorCode = "VALIDATION_ERROR";
-    throw error;
-  }
+  const activity = await activityRepository.deleteActivity(id);
 
-  // 1. Verify activity exists
-  const existing = await activityRepository.findActivityById(id);
-  if (!existing) {
+  if (!activity) {
     const error = new Error("Activity not found");
     error.statusCode = 404;
     error.errorCode = "ACTIVITY_NOT_FOUND";
     throw error;
   }
 
-  // 2. Delete activity
-  const deleted = await activityRepository.deleteActivity(id);
-  return deleted;
+  return activity;
 };
 
 module.exports = {
-  createActivity,
   getActivities,
   getActivityById,
+  createActivity,
   updateActivity,
   updateProgress,
   extendActivity,

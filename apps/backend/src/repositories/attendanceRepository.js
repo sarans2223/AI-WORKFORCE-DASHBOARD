@@ -1,126 +1,243 @@
 const { query } = require("../db/connection");
 
 /**
- * Repository for PostgreSQL attendance table queries
+ * Repository for PostgreSQL attendance table
+ *
+ * Actual database columns:
+ * id
+ * student_id
+ * date
+ * status
+ * session
+ * created_at
  */
 
+// ============================================================
+// GET ATTENDANCE BY ID
+// ============================================================
 const findAttendanceById = async (id) => {
   const sql = `
-    SELECT id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at
+    SELECT
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at
     FROM attendance
     WHERE id = $1
     LIMIT 1;
   `;
+
   const result = await query(sql, [id]);
+
   return result.rows[0] || null;
 };
 
-const findAttendanceByStudentAndDate = async (studentId, date) => {
-  const sql = `
-    SELECT id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at
+// ============================================================
+// GET ATTENDANCE BY STUDENT AND DATE
+// ============================================================
+const findAttendanceByStudentAndDate = async (studentId, date, session = null) => {
+  let sql = `
+    SELECT
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at
     FROM attendance
-    WHERE student_id = $1 AND date = $2
-    LIMIT 1;
+    WHERE student_id = $1
+      AND date = $2
   `;
-  const result = await query(sql, [studentId, date]);
+  const params = [studentId, date];
+  if (session !== null) {
+    sql += ` AND UPPER(session) = UPPER($3)`;
+    params.push(session);
+  }
+  sql += ` LIMIT 1;`;
+
+  const result = await query(sql, params);
+
   return result.rows[0] || null;
 };
 
+// ============================================================
+// GET ATTENDANCE RECORDS
+// ============================================================
 const findAttendanceRecords = async (filters = {}) => {
   let sql = `
-    SELECT id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at
+    SELECT
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at
     FROM attendance
   `;
+
   const conditions = [];
   const values = [];
 
-  if (filters.student_id) {
+  // Filter by student
+  if (
+    filters.student_id !== undefined &&
+    filters.student_id !== null
+  ) {
     values.push(filters.student_id);
     conditions.push(`student_id = $${values.length}`);
   }
 
+  // Filter by status
   if (filters.status) {
     values.push(filters.status.toUpperCase());
     conditions.push(`status = $${values.length}`);
   }
 
+  // Filter by session
+  if (filters.session) {
+    values.push(filters.session.toUpperCase());
+    conditions.push(`session = $${values.length}`);
+  }
+
+  // Filter by exact date
   if (filters.date) {
     values.push(filters.date);
     conditions.push(`date = $${values.length}`);
   }
 
+  // Filter by start date
   if (filters.start_date) {
     values.push(filters.start_date);
     conditions.push(`date >= $${values.length}`);
   }
 
+  // Filter by end date
   if (filters.end_date) {
     values.push(filters.end_date);
     conditions.push(`date <= $${values.length}`);
   }
 
   if (conditions.length > 0) {
-    sql += ` WHERE ` + conditions.join(" AND ");
+    sql += ` WHERE ${conditions.join(" AND ")}`;
   }
 
-  sql += ` ORDER BY date DESC, created_at DESC;`;
+  sql += `
+    ORDER BY date DESC, created_at DESC;
+  `;
 
   const result = await query(sql, values);
+
   return result.rows;
 };
 
-const createAttendance = async ({ student_id, date, status, remarks, check_in_time, check_out_time }) => {
+// ============================================================
+// CREATE ATTENDANCE
+// ============================================================
+const createAttendance = async ({
+  student_id,
+  date,
+  status,
+  session = 'FORENOON',
+}) => {
   const sql = `
-    INSERT INTO attendance (student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at;
+    INSERT INTO attendance (
+      student_id,
+      date,
+      status,
+      session,
+      created_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      NOW()
+    )
+    RETURNING
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at;
   `;
+
   const values = [
     student_id,
     date,
     status,
-    remarks || "",
-    check_in_time || null,
-    check_out_time || null,
+    session.toUpperCase(),
   ];
+
   const result = await query(sql, values);
+
   return result.rows[0];
 };
 
+// ============================================================
+// UPDATE ATTENDANCE
+// ============================================================
 const updateAttendance = async (id, fields) => {
-  const sql = `
+  let sql = `
     UPDATE attendance
-    SET status = COALESCE($1, status),
-        date = COALESCE($2, date),
-        remarks = COALESCE($3, remarks),
-        check_in_time = COALESCE($4, check_in_time),
-        check_out_time = COALESCE($5, check_out_time),
-        updated_at = NOW()
-    WHERE id = $6
-    RETURNING id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at;
+    SET
+      status = COALESCE($1, status),
+      date = COALESCE($2, date)
   `;
   const values = [
     fields.status || null,
     fields.date || null,
-    fields.remarks !== undefined ? fields.remarks : null,
-    fields.check_in_time !== undefined ? fields.check_in_time : null,
-    fields.check_out_time !== undefined ? fields.check_out_time : null,
-    id,
   ];
+
+  if (fields.session !== undefined) {
+    values.push(fields.session ? fields.session.toUpperCase() : null);
+    sql += `, session = COALESCE($${values.length}, session)`;
+  }
+
+  values.push(id);
+  sql += `
+    WHERE id = $${values.length}
+    RETURNING
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at;
+  `;
+
   const result = await query(sql, values);
-  return result.rows[0];
+
+  return result.rows[0] || null;
 };
 
+// ============================================================
+// DELETE ATTENDANCE
+// ============================================================
 const deleteAttendance = async (id) => {
   const sql = `
     DELETE FROM attendance
     WHERE id = $1
-    RETURNING id, student_id, date, status, remarks, check_in_time, check_out_time, created_at, updated_at;
+    RETURNING
+      id,
+      student_id,
+      date,
+      status,
+      session,
+      created_at;
   `;
+
   const result = await query(sql, [id]);
-  return result.rows[0];
+
+  return result.rows[0] || null;
 };
 
+// ============================================================
+// EXPORTS
+// ============================================================
 module.exports = {
   findAttendanceById,
   findAttendanceByStudentAndDate,
